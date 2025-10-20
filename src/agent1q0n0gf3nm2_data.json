@@ -1,0 +1,76 @@
+{
+    "students": {
+        "agent1qddgfypwrksthknutu7pxxk4mkp86uma7g0lrxp8ae3wdx472qjxyxhzgp5": {
+            "Science": {
+                "level": "Advanced",
+                "history": [
+                    {
+                        "timestamp": "2025-10-20T11:56:04.560681",
+                        "query": "I'm ready for today's lesson! Can we start with Science?"
+                    },
+                    {
+                        "timestamp": "2025-10-20T11:56:08.542548",
+                        "query": "Okay, I'm ready for the quiz."
+                    },
+                    {
+                        "timestamp": "2025-10-20T11:56:13.557902",
+                        "query": "I think the answer is 42."
+                    },
+                    {
+                        "timestamp": "2025-10-20T11:56:18.473960",
+                        "query": "That was a good lesson. I feel like I'm getting better at Math. I would say my level is advanced now."
+                    },
+                    {
+                        "timestamp": "2025-10-20T11:56:22.575965",
+                        "query": "Thank you for the lesson!"
+                    },
+                    {
+                        "timestamp": "2025-10-20T12:19:23.841415",
+                        "query": "I'm ready for today's lesson! Can we start with Science?"
+                    },
+                    {
+                        "timestamp": "2025-10-20T12:19:27.932885",
+                        "query": "Okay, I'm ready for the quiz."
+                    },
+                    {
+                        "timestamp": "2025-10-20T12:19:31.561016",
+                        "query": "I think the answer is 42."
+                    },
+                    {
+                        "timestamp": "2025-10-20T12:19:35.306107",
+                        "query": "That was a good lesson. I feel like I'm getting better at Math. I would say my level is advanced now."
+                    },
+                    {
+                        "timestamp": "2025-10-20T12:19:39.815078",
+                        "query": "Thank you for the lesson!"
+                    }
+                ]
+            },
+            "Biology": {
+                "level": "Advanced",
+                "history": [
+                    {
+                        "timestamp": "2025-10-20T12:11:14.472472",
+                        "query": "I'm ready for today's lesson! Can we start with Biology?"
+                    },
+                    {
+                        "timestamp": "2025-10-20T12:11:18.260355",
+                        "query": "Okay, I'm ready for the quiz."
+                    },
+                    {
+                        "timestamp": "2025-10-20T12:11:22.157775",
+                        "query": "I think the answer is 42."
+                    },
+                    {
+                        "timestamp": "2025-10-20T12:11:25.997166",
+                        "query": "That was a good lesson. I feel like I'm getting better at Math. I would say my level is advanced now."
+                    },
+                    {
+                        "timestamp": "2025-10-20T12:11:30.449920",
+                        "query": "Thank you for the lesson!"
+                    }
+                ]
+            }
+        }
+    }
+}

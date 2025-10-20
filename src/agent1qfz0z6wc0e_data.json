@@ -1,3 +1,7 @@
 {
-    "student_id": "agent1qddgfypwrksthknutu7pxxk4mkp86uma7g0lrxp8ae3wdx472qjxyxhzgp5"
+    "student_id": "agent1qddgfypwrksthknutu7pxxk4mkp86uma7g0lrxp8ae3wdx472qjxyxhzgp5",
+    "agent1qddgfypwrksthknutu7pxxk4mkp86uma7g0lrxp8ae3wdx472qjxyxhzgp5": {
+        "subject": "Science",
+        "level": "Advanced"
+    }
 }
