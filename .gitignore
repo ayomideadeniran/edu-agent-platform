@@ -1,1 +1,26 @@
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+*.so
+
+# Virtual environments
 venv/
+env/
+.venv/
+ENV/
+
+# Logs and database
+*.log
+*.sqlite3
+
+# OS and editor junk
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Test and build artifacts
+build/
+dist/
+*.egg-info/
+
