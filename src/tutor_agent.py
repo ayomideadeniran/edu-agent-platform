@@ -1,230 +1,278 @@
+import sys
+import os
+import json
 from datetime import datetime
 from uuid import uuid4
-import re  # Added for simple regex/string parsing
+
+# --- CRITICAL ABSOLUTE PATH FIX ---
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(current_dir)
+if project_root not in sys.path:
+    sys.path.append(project_root)
+
+# --- UAGENTS CORE IMPORTS ---
 from uagents import Agent, Context, Protocol
 from uagents.setup import fund_agent_if_low
 from uagents_core.contrib.protocols.chat import (
-   ChatAcknowledgement,
-   ChatMessage,
-   EndSessionContent,
-   StartSessionContent,
-   TextContent,
-   chat_protocol_spec,
+    ChatAcknowledgement,
+    ChatMessage,
+    EndSessionContent,
+    StartSessionContent,
+    TextContent,
+    chat_protocol_spec,
 )
+from uagents_core.models import Model
 
-# Import the Knowledge Protocol message types (assuming you have them defined)
-# NOTE: Replace 'knowledge_protocol_messages' with your actual file name if different
-try:
-    from knowledge_protocol_messages import KnowledgeQuery, KnowledgeResponse
-except ImportError:
-    print("WARNING: knowledge_protocol_messages.py not found. Using placeholder classes.")
-    class KnowledgeQuery:
-        def __init__(self, student_address, subject, query):
-            self.student_address = student_address
-            self.subject = subject
-            self.query = query
-    class KnowledgeResponse:
-        def __init__(self, student_address, result):
-            self.student_address = student_address
-            self.result = result
+# --- AGENT-SPECIFIC MODELS (Must match Knowledge Agent) ---
+class KnowledgeQuery(Model):
+    subject: str
+    level: str # e.g., 'Beginner', 'Intermediate'
+
+class KnowledgeResponse(Model):
+    subject: str
+    topic: str
+    question: str
+    answer: str
+    explanation: str
+
+# These models are for communication with the Student Agent (History retrieval)
+class HistoryQuery(TextContent):
+    type: str = "history_query"
+    query: str
+    
+class HistoryResponse(TextContent):
+    type: str = "history_response"
+    history_data: str 
+
+# --- GLOBAL VARIABLE FOR BUG WORKAROUND ---
+STUDENT_ADDRESS = None
 
 # --- CONFIGURATION ---
-AGENT_MAILBOX_KEY = "tutor_agent_mailbox"
+KNOWLEDGE_AGENT_ADDRESS = None
+try:
+    with open("knowledge_address.txt", "r") as f:
+        KNOWLEDGE_AGENT_ADDRESS = f.read().strip()
+    if not KNOWLEDGE_AGENT_ADDRESS:
+         print("Knowledge Agent address file is empty. Please run knowledge_agent.py first.")
+except FileNotFoundError:
+    print("Knowledge Agent address file not found. Please run knowledge_agent.py first.")
 
+
+# Simplified "curriculum" to get available subjects (No need to load json now)
+CURRICULUM = {"Math"}
+
+
+# --- AGENT SETUP ---
 agent = Agent(
     name="tutor_agent",
     port=8001,
     seed="tutor_agent_seed_phrase",
     endpoint=["http://127.0.0.1:8001/submit"],
-    mailbox=AGENT_MAILBOX_KEY,
 )
 
-# Attempt to fund the agent (errors here are usually ignorable in this setup)
 fund_agent_if_low(agent.wallet.address())
 
 chat_proto = Protocol(spec=chat_protocol_spec)
 
-# Safely load the knowledge address
-try:
-    with open("knowledge_address.txt", "r") as f:
-        KNOWLEDGE_AGENT_ADDRESS = f.read().strip()
-except FileNotFoundError:
-    KNOWLEDGE_AGENT_ADDRESS = None
+# --- AGENT STATE MANAGEMENT ---
+def get_default_state(subject):
+    return {
+        "level": "Beginner",
+        "subject": subject,
+        "score": 0,
+        "history": [],
+        "current_question": None
+    }
 
 # --- HELPER FUNCTIONS ---
 
-def create_text_chat(text: str, end_session: bool = False) -> ChatMessage:
-    content = [TextContent(type="text", text=text)]
-    if end_session:
-        content.append(EndSessionContent())
+def create_text_chat(text: str, content_model=TextContent) -> ChatMessage:
+    """Creates a generic ChatMessage with a single content item."""
     return ChatMessage(
         timestamp=datetime.utcnow(),
         msg_id=uuid4(),
-        content=content,
+        content=[content_model(text=text)],
     )
 
-async def send_lesson(ctx: Context, student_address: str, student_text: str):
-    # 🌟 MODIFIED: Only query the Knowledge Agent, do NOT send a placeholder response.
-    # The response will be handled *after* the Knowledge Agent replies.
-    
-    # Get the student's stored subject (retrieved during handle_message)
-    student_data = ctx.storage.get(student_address) or {"subject": "Math"}
-    subject = student_data.get("subject", "Math")
-    
-    # 1. QUERY KNOWLEDGE AGENT
-    knowledge_query = KnowledgeQuery(
-        student_address=student_address, 
-        subject=subject, 
-        # Pass the full text so the Knowledge Agent can check for level updates
-        query=student_text 
+def create_history_response(history_data: dict) -> ChatMessage:
+    """Creates a ChatMessage with the specialized HistoryResponse content."""
+    history_json = json.dumps(history_data)
+    return ChatMessage(
+        timestamp=datetime.utcnow(),
+        msg_id=uuid4(),
+        content=[HistoryResponse(text="Progress History", history_data=history_json)],
     )
+
+# --- KNOWLEDGE RESPONSE HANDLER (FINAL, GUARANTEED DELIVERY FIX) ---
+
+@agent.on_message(model=KnowledgeResponse) 
+async def handle_knowledge_response(ctx: Context, sender: str, msg: KnowledgeResponse):
+    """
+    Handles the response from the Knowledge Agent with a question.
     
-    # Check for the address before sending
-    if not KNOWLEDGE_AGENT_ADDRESS:
-        ctx.logger.error("Cannot send query: KNOWLEDGE_AGENT_ADDRESS is not set.")
+    GUARANTEED FIX: Uses the global STUDENT_ADDRESS to bypass all storage key issues.
+    """
+    global STUDENT_ADDRESS
+    
+    # 1. Validate the sender
+    if sender != KNOWLEDGE_AGENT_ADDRESS:
+        ctx.logger.warning(f"Received unexpected KnowledgeResponse from {sender}. Ignoring.")
         return
-
-    await ctx.send(KNOWLEDGE_AGENT_ADDRESS, knowledge_query)
-    ctx.logger.info(f"Sent knowledge query to {KNOWLEDGE_AGENT_ADDRESS} for student {student_address}")
-
-    # The conversation halts here until handle_knowledge_response is triggered.
-
-
-# --- AGENT EVENT HANDLERS ---
-
-@agent.on_event("startup")
-async def setup_agent(ctx: Context):
-    if not KNOWLEDGE_AGENT_ADDRESS:
-        ctx.logger.error("Knowledge Agent address not found. Please ensure it's running first.")
-        # NOTE: The main execution block below will set a placeholder if the file is missing
+    
+    # 2. Get the student's address from the global variable
+    if not STUDENT_ADDRESS:
+        ctx.logger.error("FATAL: KnowledgeResponse received but no student session address is set.")
         return
+    
+    student_address = STUDENT_ADDRESS
+    student_state = ctx.storage.get(student_address)
 
-# -------------------------------------------------------------
-# HANDLERS FOR CHAT PROTOCOL (Student Agent Communication)
-# -------------------------------------------------------------
+    # Check that data exists for the student
+    if not student_state:
+        ctx.logger.error(f"FATAL: Student address {student_address} is set but no state data found.")
+        return
+    
+    # 3. Process the response and update state
+    
+    # Final check: Ensure the student is waiting for a question on the correct subject
+    if student_state.get('subject') != msg.subject or student_state.get('current_question') is not None:
+         ctx.logger.warning(f"Student {student_address} found but state is inconsistent (subject mismatch or question already set).")
+         return
 
-@chat_proto.on_message(ChatMessage)
+    student_state["current_question"] = msg.dict() # Store the question details
+    ctx.storage.set(student_address, student_state)
+    
+    ctx.logger.info(f"Received question for {student_address}. Subject: {msg.subject}, Topic: {msg.topic}")
+
+    # 4. Build the lesson message
+    intro_message = f"Hello, I'm ready to teach **{msg.subject}**! Based on your level (**{student_state['level']}**), we'll start with the topic: **{student_state['current_question']['topic']}**."
+    question_message = f"Here is your first question:\n\n**Question:** {student_state['current_question']['question']}"
+
+    full_message = f"{intro_message}\n\n{question_message}"
+    
+    # 5. Send the response back to the student
+    await ctx.send(student_address, create_text_chat(full_message))
+    ctx.logger.info(f"Sent lesson content to {student_address}")
+
+
+# --- CHAT PROTOCOL HANDLERS ---
+@chat_proto.on_message(model=ChatMessage) 
 async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
-    # Always send acknowledgement first
+    """Handles incoming chat messages (Start Session, Student Reply, History Query) from the Student Agent."""
+    
+    global STUDENT_ADDRESS
+    
+    # 1. Acknowledge message immediately
     await ctx.send(sender, ChatAcknowledgement(timestamp=datetime.utcnow(), acknowledged_msg_id=msg.msg_id))
-
+    ctx.logger.info(f"Acknowledged message {msg.msg_id} from {sender}")
+    
+    # Load or initialize student state
+    student_state = ctx.storage.get(sender)
+    
+    # Process message contents
     for item in msg.content:
-        # Marks the start of a chat session
+        
+        # --- 1. Handle START SESSION (CRITICAL: Store the sender address) ---
         if isinstance(item, StartSessionContent):
             ctx.logger.info(f"Session started with {sender}")
-            # Ensure student has a data entry if starting a new session
-            if not ctx.storage.get(sender):
-                 ctx.storage.set(sender, {"subject": "Unknown", "level": "Unknown"})
+            STUDENT_ADDRESS = sender # CRITICAL: STORE THE ADDRESS
+            # Initialize the state. The first message from the student will set the subject.
+            ctx.storage.set(sender, get_default_state(subject=None))
+            return
 
-        # Handles plain text messages (from student agent)
+        # --- 2. Handle HISTORY QUERY ---
+        elif isinstance(item, HistoryQuery):
+            ctx.logger.info(f"Received history query from {sender}: {item.query}")
+            
+            if not student_state:
+                await ctx.send(sender, create_text_chat("I cannot find your session data. Please start a subject first."))
+                return
+
+            history_message = create_history_response(student_state)
+            await ctx.send(sender, history_message)
+            ctx.logger.info(f"Sent history response to {sender}")
+            return
+        
+        # --- 3. Handle TEXT CONTENT (Initial Subject or Answer/Reply) ---
         elif isinstance(item, TextContent):
-            ctx.logger.info(f"Text message from {sender}: {item.text}")
             
-            # --- DYNAMIC SUBJECT/LEVEL EXTRACTION LOGIC (Keep this to pre-process data) ---
-            text_lower = item.text.lower()
-            subject = None
-            
-            # Use regex to find a subject after "start with" or "continue with"
-            match = re.search(r'(?:start with|continue with)\s+([a-zA-Z]+)', text_lower)
-            
-            if match:
-                subject = match.group(1).capitalize()
-            
-            # If a message contains a subject or level change, process and store it
-            if subject or any(word in text_lower for word in ["level", "advanced", "beginner"]):
-                # Load student data
-                student_data = ctx.storage.get(sender) or {"subject": "Unknown", "level": "Unknown"}
-                
-                # Check for explicit level change (e.g., "my level is advanced now")
-                level_match = re.search(r'my level is\s+([a-zA-Z]+)', text_lower)
-                if level_match:
-                    student_data["level"] = level_match.group(1).capitalize()
-                    ctx.logger.info(f"Updated {sender}'s internal level to: {student_data['level']}")
-                
-                # Update the current subject only if it was explicitly requested
-                if subject and ("start with" in text_lower or "continue with" in text_lower):
-                    student_data["subject"] = subject
-                    ctx.logger.info(f"Set {sender}'s subject to: {subject}")
-                
-                # Save the updated data
-                ctx.storage.set(sender, student_data)
-            
-            # Proceed to send the lesson response (which now only sends a query)
-            await send_lesson(ctx, sender, item.text)
+            if not student_state:
+                ctx.logger.error(f"Received TextContent from {sender} but no session state exists.")
+                return
 
-        # Marks the end of a chat session
-        elif isinstance(item, EndSessionContent):
-            ctx.logger.info(f"Session ended with {sender}")
-        # Catches anything unexpected
-        else:
-            ctx.logger.info(f"Received unexpected content type from {sender}")
+            text = item.text.strip()
+            ctx.logger.info(f"Received text from {sender}: '{text}'")
+            
+            # A. First Message: Subject Selection (Subject is None)
+            if student_state.get('subject') is None:
+                subject = text
+                if subject in CURRICULUM:
+                    student_state['subject'] = subject
+                    ctx.storage.set(sender, student_state)
+                    
+                    # --- CRITICAL: QUERY KNOWLEDGE AGENT ---
+                    if KNOWLEDGE_AGENT_ADDRESS:
+                        query_msg = KnowledgeQuery(subject=subject, level=student_state["level"])
+                        await ctx.send(KNOWLEDGE_AGENT_ADDRESS, query_msg)
+                        ctx.logger.info(f"Successfully sent KnowledgeQuery to {KNOWLEDGE_AGENT_ADDRESS} for subject: {subject}")
+                    else:
+                        await ctx.send(sender, create_text_chat("Error: Tutor cannot connect to the Knowledge Agent. Please check its address."))
+                else:
+                    await ctx.send(sender, create_text_chat(f"Sorry, I don't offer a curriculum for '{subject}'. Please choose from: {', '.join(CURRICULUM)}"))
+                return
+                
+            # B. Subsequent Message: Answer/Reply (Subject is set)
+            else:
+                current_q = student_state.get('current_question')
+                
+                # If there is a question waiting for an answer
+                if current_q:
+                    answer_text = current_q.get('answer', '').strip()
+                    is_correct = text.lower() == answer_text.lower()
+                    
+                    # Update state
+                    student_state['score'] += 1 if is_correct else 0
+                    student_state['history'].append({
+                        'topic': current_q.get('topic'),
+                        'correct': is_correct,
+                        'date': datetime.utcnow().isoformat()
+                    })
+                    student_state['current_question'] = None # Clear question after answering
+                    ctx.storage.set(sender, student_state)
+                    
+                    # Send feedback
+                    feedback = ""
+                    if is_correct:
+                        feedback = f"That is **correct**! Great job. The explanation is: {current_q.get('explanation')}"
+                    else:
+                        feedback = f"That is **incorrect**. The correct answer was **{answer_text}**. The explanation is: {current_q.get('explanation')}"
+                        
+                    await ctx.send(sender, create_text_chat(f"{feedback}\n\nReady for the next question? Type 'next topic' or 'next question'."))
+                    return
 
-@chat_proto.on_message(ChatAcknowledgement)
-# Use 'def' to avoid the non-critical TypeError you were seeing previously
-def handle_acknowledgement( 
-    ctx: Context, sender: str, msg: ChatAcknowledgement
-):
+                # If the student asked for the next question/topic
+                elif 'next' in text.lower():
+                    subject = student_state['subject']
+                    query_msg = KnowledgeQuery(subject=subject, level=student_state["level"])
+                    await ctx.send(KNOWLEDGE_AGENT_ADDRESS, query_msg)
+                    ctx.logger.info(f"Sent request for next topic/question to {KNOWLEDGE_AGENT_ADDRESS}")
+                else:
+                    await ctx.send(sender, create_text_chat("I'm ready for your answer or if you'd like to move on, type 'next question'."))
+            
+
+    return None
+
+@chat_proto.on_message(model=ChatAcknowledgement)
+async def handle_acknowledgement(ctx: Context, sender: str, msg: ChatAcknowledgement):
     ctx.logger.info(
         f"Received acknowledgement from {sender} for message {msg.acknowledged_msg_id}"
     )
-
-# -------------------------------------------------------------
-# HANDLERS FOR KNOWLEDGE PROTOCOL (Knowledge Agent Communication)
-# -------------------------------------------------------------
-
-# tutor_agent.py
-
-# tutor_agent.py (Only changes in handle_knowledge_response are shown)
-
-# -------------------------------------------------------------
-# HANDLERS FOR KNOWLEDGE PROTOCOL (Knowledge Agent Communication)
-# -------------------------------------------------------------
-
-@agent.on_message(model=KnowledgeResponse, replies={ChatMessage, ChatAcknowledgement})
-async def handle_knowledge_response(ctx: Context, sender: str, msg: KnowledgeResponse):
-    ctx.logger.info(f"Received personalized knowledge response from {sender} for student {msg.student_address}")
-    
-    # 1. Parse the result dictionary from the Knowledge Agent
-    result_data = msg.result
-    
-    # Extract the necessary fields
-    subject = result_data.get("subject", "Unknown Subject")
-    level = result_data.get("level", "Unknown")
-    suggested_topic = result_data.get("suggested_topic", "General Review")
-
-    # 2. Formulate the final, personalized ChatMessage
-    response_text = (
-        f"Hello, Tutor here! The Knowledge Agent reports your current **{subject}** "
-        f"proficiency is **{level}**. Based on that, let's start with the topic: **{suggested_topic}**."
-    )
-    
-    # 3. Send the final message back to the Student Agent
-    tutor_response = create_text_chat(response_text)
-    await ctx.send(msg.student_address, tutor_response)
-    ctx.logger.info(f"Sent personalized lesson: '{response_text}' to {msg.student_address}")
-
-    # 4. CRITICAL FIX: Send a ChatAcknowledgement back to the Knowledge Agent (sender)
-    # This completes the message transport handshake.
-    await ctx.send(sender, ChatAcknowledgement(timestamp=datetime.utcnow(), acknowledged_msg_id=uuid4())) 
-    
-    # 🌟 NEW FIX: Explicitly return None to ensure the framework doesn't try to 
-    # await an invalid return object from the handler function.
-    return None # <--- THIS LINE IS THE FIX
-
+    return None
 
 # --- MAIN EXECUTION ---
 agent.include(chat_proto, publish_manifest=True)
 
 if __name__ == "__main__":
-    # Ensure the knowledge address is available or save a placeholder
-    if not KNOWLEDGE_AGENT_ADDRESS:
-        print("\nWARNING: knowledge_address.txt not found. Using a dummy address.")
-        KNOWLEDGE_AGENT_ADDRESS = "agent1q0n0gf3nm2mevkj6mm45cmjvm3sx23glx38sdmn4kjmw8xm4stn2q600dnq" # Use an arbitrary address
-
-    # Save the tutor address for the student agent to use
     with open("tutor_address.txt", "w") as f:
         f.write(agent.address)
-        
     agent.run()
-
-

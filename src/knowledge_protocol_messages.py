@@ -17,3 +17,8 @@ class KnowledgeResponse(Model):
     student_address: str
     # 'result' is the dictionary containing the personalized data (level, topic, etc.)
     result: dict
+
+
+
+
+

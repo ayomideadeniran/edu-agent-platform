@@ -1,4 +1,5 @@
 {
     "replied_to_tutor": true,
-    "conversation_turn": 4
+    "conversation_turn": 4,
+    "input_loop_started": true
 }

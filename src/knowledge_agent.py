@@ -1,102 +1,177 @@
-from datetime import datetime
+import sys
+import os
 from uagents import Agent, Context
 from uagents.setup import fund_agent_if_low
+from uagents_core.models import Model
 
-# --- CONFIGURATION ---
-AGENT_MAILBOX_KEY = "knowledge_agent_mailbox"
+# --- CRITICAL ABSOLUTE PATH FIX ---
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(current_dir)
+if project_root not in sys.path:
+    sys.path.append(project_root)
 
+# --- AGENT-SPECIFIC MODELS (Must match Tutor Agent) ---
+class KnowledgeQuery(Model):
+    subject: str
+    level: str # e.g., 'Beginner', 'Intermediate'
+
+class KnowledgeResponse(Model):
+    subject: str
+    topic: str
+    question: str
+    answer: str
+    explanation: str
+
+# --- CONFIGURATION: EXTENDED CURRICULUM ---
+CURRICULUM = {
+  "Math": {
+    "Beginner": [
+      {
+        "topic": "Basic Arithmetic",
+        "questions": [
+          {
+            "question": "What is 5 plus 3?",
+            "answer": "8",
+            "explanation": "Addition is the process of combining two or more numbers."
+          },
+          {
+            "question": "What is 10 minus 4?",
+            "answer": "6",
+            "explanation": "Subtraction is finding the difference between two numbers."
+          },
+          {
+            "question": "What is 2 multiplied by 5?",
+            "answer": "10",
+            "explanation": "Multiplication is repeated addition."
+          }
+        ]
+      },
+      {
+        "topic": "Basic Geometry",
+        "questions": [
+          {
+            "question": "How many sides does a triangle have?",
+            "answer": "3",
+            "explanation": "A triangle is a polygon with three edges and three vertices."
+          }
+        ]
+      }
+    ]
+  },
+  "History": {
+    "Beginner": [
+      {
+        "topic": "Ancient Civilizations",
+        "questions": [
+          {
+            "question": "Which ancient civilization built the pyramids of Giza?",
+            "answer": "Egyptian",
+            "explanation": "The Ancient Egyptians built the pyramids as tombs for their pharaohs."
+          },
+          {
+            "question": "Who was the first emperor of Rome?",
+            "answer": "Augustus",
+            "explanation": "Augustus, originally named Octavian, was the founder of the Roman Principate."
+          }
+        ]
+      }
+    ]
+  },
+  "Science": {
+    "Beginner": [
+      {
+        "topic": "The Solar System",
+        "questions": [
+          {
+            "question": "Which planet is known as the 'Red Planet'?",
+            "answer": "Mars",
+            "explanation": "Mars gets its reddish appearance from iron oxide (rust) on its surface."
+          }
+        ]
+      }
+    ]
+  }
+}
+print("Curriculum loaded successfully internally with multiple subjects and questions.")
+
+
+# --- AGENT SETUP ---
 agent = Agent(
     name="knowledge_agent",
     port=8002,
     seed="knowledge_agent_seed_phrase",
     endpoint=["http://127.0.0.1:8002/submit"],
-    mailbox=AGENT_MAILBOX_KEY,
 )
 
-# Attempt to fund the agent (errors here are usually ignorable in this setup)
 fund_agent_if_low(agent.wallet.address())
 
-# Import the Knowledge Protocol message types (assuming they are in knowledge_protocol_messages.py)
-try:
-    from knowledge_protocol_messages import KnowledgeQuery, KnowledgeResponse
-except ImportError:
-    # Placeholder classes for demonstration if the file is missing
-    print("WARNING: knowledge_protocol_messages.py not found. Using placeholder classes.")
-    class KnowledgeQuery:
-        def __init__(self, student_address, subject, query):
-            self.student_address = student_address
-            self.subject = subject
-            self.query = query
-    class KnowledgeResponse:
-        def __init__(self, student_address, result):
-            self.student_address = student_address
-            self.result = result
 
-# --- AGENT EVENT HANDLERS ---
+# --- KNOWLEDGE HANDLER ---
 
-@agent.on_message(model=KnowledgeQuery, replies=KnowledgeResponse)
-async def handle_query(ctx: Context, sender: str, msg: KnowledgeQuery):
-    ctx.logger.info(f"Received knowledge query from {sender} for student {msg.student_address}")
+@agent.on_message(model=KnowledgeQuery) 
+async def handle_knowledge_query(ctx: Context, sender: str, msg: KnowledgeQuery):
+    """Handles requests for lesson content from the Tutor Agent."""
 
-    # Use the student's address as the storage key
-    student_key = msg.student_address 
-
-    # 1. Load Data: Get all student data or initialize an empty dictionary
-    # Data structure: {'students': {'student_key_1': {'Math': {...}, 'History': {...}}}}
-    all_student_data = ctx.storage.get("students") or {} 
-    
-    # Get the specific student's record, or initialize as an empty subject dict
-    student_record = all_student_data.get(student_key, {})
-
-    # Ensure the student has an entry for the requested subject
-    # We initialize the level to 'Beginner' if we haven't seen this subject before.
-    if msg.subject not in student_record:
-        student_record[msg.subject] = {"level": "Beginner", "history": []}
-        
-    subject_data = student_record[msg.subject]
-    
-    # 2. Process Query: Check if the query indicates a level update (e.g., from the last student message)
-    query_lower = msg.query.lower()
-
-    if "level is advanced now" in query_lower:
-        subject_data["level"] = "Advanced"
-        ctx.logger.info(f"Updated {msg.subject} level for {student_key} to: Advanced")
-    
-    # Record the query in the student's history
-    subject_data["history"].append({
-        "timestamp": datetime.utcnow().isoformat(), 
-        "query": msg.query
-    })
-
-    # 3. Save Data: Save the updated record back to storage
-    student_record[msg.subject] = subject_data       # Update subject data
-    all_student_data[student_key] = student_record   # Update student record
-    ctx.storage.set("students", all_student_data)    # Persist all data
-    
-    ctx.logger.info(f"Current {msg.subject} level for {student_key}: {subject_data['level']}")
-
-    # 4. Send Response: Package the student's status into a KnowledgeResponse
-    # This result is what the Tutor Agent will use to personalize the lesson.
-    response_result = {
-        "subject": msg.subject,
-        "level": subject_data["level"],
-        "suggested_topic": "MeTTa Integration Basics" if subject_data["level"] == "Beginner" else "Advanced Graph Traversal"
-    }
-    
-    await ctx.send(
-        sender, # Sender is the Tutor Agent
-        KnowledgeResponse(
-            student_address=msg.student_address,
-            result=response_result # The payload containing the student's knowledge status
-        )
+    ctx.logger.info(
+        f"KNOWLEDGE AGENT: Received query from {sender} for subject: {msg.subject} at level: {msg.level}!"
     )
+    
+    subject_data = CURRICULUM.get(msg.subject)
+    
+    if not subject_data:
+        ctx.logger.error(f"Subject '{msg.subject}' not found in curriculum.")
+        # Optionally send a failure response back to the Tutor if the subject is invalid
+        return
+
+    level_data = subject_data.get(msg.level)
+    if not level_data:
+        ctx.logger.error(f"Level '{msg.level}' not found for subject '{msg.subject}'.")
+        return
+
+    # To send multiple questions, we need to know WHICH question to send.
+    # Since the Tutor Agent currently only sends a generic request, we will 
+    # **always select the first topic and the first question in that topic** # for simplicity in this demo.
+    
+    topic_data = level_data[0] 
+    
+    # CRITICAL: We need a simple way to cycle questions if the student asks for 'next question'.
+    # We will use the agent's internal storage to track the index of the last question sent.
+    
+    current_index = ctx.storage.get("question_index")
+    if current_index is None:
+        current_index = 0
+    
+    questions = topic_data["questions"]
+    
+    if current_index >= len(questions):
+        # Reset to the first question or move to the next topic (if logic existed)
+        current_index = 0 
+        
+    question_data = questions[current_index]
+
+    # 1. Prepare the response model
+    response_msg = KnowledgeResponse(
+        subject=msg.subject,
+        topic=topic_data["topic"],
+        question=question_data["question"],
+        answer=question_data["answer"],
+        explanation=question_data["explanation"]
+    )
+
+    # 2. Update the index for the next request
+    ctx.storage.set("question_index", current_index + 1)
+    
+    # 3. Send the response back to the Tutor Agent
+    await ctx.send(sender, response_msg)
+    ctx.logger.info(f"KNOWLEDGE AGENT: Sent question index {current_index} for topic: {topic_data['topic']} back to {sender}")
+
 
 # --- MAIN EXECUTION ---
 if __name__ == "__main__":
-    # Save the knowledge agent's address for the Tutor Agent to use
     with open("knowledge_address.txt", "w") as f:
         f.write(agent.address)
-        
     agent.run()
+
+
 
 

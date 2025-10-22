@@ -1,0 +1,16 @@
+{
+  "Math": {
+    "Beginner": [
+      {
+        "topic": "Basic Arithmetic",
+        "questions": [
+          {
+            "question": "What is 5 plus 3?",
+            "answer": "8",
+            "explanation": "Addition is the process of combining two or more numbers."
+          }
+        ]
+      }
+    ]
+  }
+}
