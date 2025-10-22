@@ -24,4 +24,4 @@ build/
 dist/
 *.egg-info/
 
-src/fetchd/
+# src/fetchd/
