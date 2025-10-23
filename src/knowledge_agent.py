@@ -1,8 +1,9 @@
 import sys
 import os
-from uagents import Agent, Context
-from uagents.setup import fund_agent_if_low
-from uagents_core.models import Model
+import json
+import random # <-- Used for randomization
+from datetime import datetime
+from uuid import uuid4
 
 # --- CRITICAL ABSOLUTE PATH FIX ---
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -10,7 +11,12 @@ project_root = os.path.dirname(current_dir)
 if project_root not in sys.path:
     sys.path.append(project_root)
 
-# --- AGENT-SPECIFIC MODELS ---
+# --- UAGENTS CORE IMPORTS ---
+from uagents import Agent, Context
+from uagents.setup import fund_agent_if_low
+from uagents_core.models import Model
+
+# --- AGENT-SPECIFIC MODELS (Tutor Agent Communication) ---
 class KnowledgeQuery(Model):
     subject: str
     level: str # e.g., 'Beginner', 'Intermediate'
@@ -22,77 +28,21 @@ class KnowledgeResponse(Model):
     answer: str
     explanation: str
 
-# --- CONFIGURATION: EXTENDED CURRICULUM ---
-CURRICULUM = {
-  "Math": {
-    "Beginner": [
-      {
-        "topic": "Basic Arithmetic",
-        "questions": [
-          {
-            "question": "What is 5 plus 3?",
-            "answer": "8",
-            "explanation": "Addition is the process of combining two or more numbers."
-          },
-          {
-            "question": "What is 10 minus 4?",
-            "answer": "6",
-            "explanation": "Subtraction is finding the difference between two numbers."
-          },
-          {
-            "question": "What is 2 multiplied by 5?",
-            "answer": "10",
-            "explanation": "Multiplication is repeated addition."
-          }
-        ]
-      },
-      {
-        "topic": "Basic Geometry",
-        "questions": [
-          {
-            "question": "How many sides does a triangle have?",
-            "answer": "3",
-            "explanation": "A triangle is a polygon with three edges and three vertices."
-          }
-        ]
-      }
-    ]
-  },
-  "History": {
-    "Beginner": [
-      {
-        "topic": "Ancient Civilizations",
-        "questions": [
-          {
-            "question": "Which ancient civilization built the pyramids of Giza?",
-            "answer": "Egyptian",
-            "explanation": "The Ancient Egyptians built the pyramids as tombs for their pharaohs."
-          },
-          {
-            "question": "Who was the first emperor of Rome?",
-            "answer": "Augustus",
-            "explanation": "Augustus, originally named Octavian, was the founder of the Roman Principate."
-          }
-        ]
-      }
-    ]
-  },
-  "Science": {
-    "Beginner": [
-      {
-        "topic": "The Solar System",
-        "questions": [
-          {
-            "question": "Which planet is known as the 'Red Planet'?",
-            "answer": "Mars",
-            "explanation": "Mars gets its reddish appearance from iron oxide (rust) on its surface."
-          }
-        ]
-      }
-    ]
-  }
-}
-print("Curriculum loaded successfully internally with multiple subjects and questions.")
+# --- CONFIGURATION (Load Curriculum from JSON) ---
+CURRICULUM = {}
+CURRICULUM_FILE = "curriculum.json"
+
+try:
+    with open(CURRICULUM_FILE, "r") as f:
+        CURRICULUM = json.load(f)
+    print(f"Knowledge Agent successfully loaded curriculum from {CURRICULUM_FILE}.")
+    
+except FileNotFoundError:
+    print(f"FATAL: Curriculum file '{CURRICULUM_FILE}' not found. Agent cannot function.")
+    sys.exit(1)
+except json.JSONDecodeError:
+    print(f"FATAL: Error decoding JSON from '{CURRICULUM_FILE}'. Check file format.")
+    sys.exit(1)
 
 
 # --- AGENT SETUP ---
@@ -106,62 +56,84 @@ agent = Agent(
 fund_agent_if_low(agent.wallet.address())
 
 
-# --- KNOWLEDGE HANDLER ---
-
-@agent.on_message(model=KnowledgeQuery) 
+# --- MESSAGE HANDLERS (UPDATED for Randomization) ---
+@agent.on_message(model=KnowledgeQuery)
 async def handle_knowledge_query(ctx: Context, sender: str, msg: KnowledgeQuery):
-    """Handles requests for lesson content from the Tutor Agent."""
+    """
+    Handles queries from the Tutor Agent and returns a random question 
+    based on the subject and level.
+    """
+    subject = msg.subject
+    level = msg.level
+    
+    ctx.logger.info(f"Received query for Subject: {subject}, Level: {level}")
 
-    ctx.logger.info(
-        f"KNOWLEDGE AGENT: Received query from {sender} for subject: {msg.subject} at level: {msg.level}!"
-    )
-    
-    subject_data = CURRICULUM.get(msg.subject)
-    
-    if not subject_data:
-        ctx.logger.error(f"Subject '{msg.subject}' not found in curriculum.")
+    # Check if the subject exists in the loaded curriculum
+    if subject not in CURRICULUM:
+        ctx.logger.warning(f"Subject '{subject}' not found in curriculum.")
+        await ctx.send(
+            sender, 
+            KnowledgeResponse(
+                subject=subject, 
+                topic="Error", 
+                question="Subject not available.", 
+                answer="", 
+                explanation=""
+            )
+        )
         return
 
-    level_data = subject_data.get(msg.level)
-    if not level_data:
-        ctx.logger.error(f"Level '{msg.level}' not found for subject '{msg.subject}'.")
+    # --- UPDATED LOGIC TO GATHER ALL RELEVANT QUESTIONS ---
+    all_relevant_questions = []
+    
+    # Iterate through all topics within the chosen subject
+    for topic_data in CURRICULUM[subject]:
+        # Check if the topic level matches the requested level
+        if topic_data["level"].lower() == level.lower():
+            # Extend the list with all questions from this topic
+            all_relevant_questions.extend(topic_data["questions"])
+    # --- END UPDATED LOGIC ---
+    
+    if not all_relevant_questions:
+        ctx.logger.warning(f"No content found for Subject: {subject}, Level: {level}")
+        await ctx.send(
+            sender, 
+            KnowledgeResponse(
+                subject=subject, 
+                topic="Error", 
+                question="No questions available at this level.", 
+                answer="", 
+                explanation=""
+            )
+        )
         return
 
-    # Use the first topic for the selected subject/level for simplicity
-    topic_data = level_data[0] 
+    # Randomly select a question from the gathered list
+    selected_question_data = random.choice(all_relevant_questions)
     
-    # CRITICAL: Use the agent's internal storage to track the index of the last question sent.
-    current_index = ctx.storage.get("question_index")
-    if current_index is None:
-        current_index = 0
-    
-    questions = topic_data["questions"]
-    
-    if current_index >= len(questions):
-        # Wrap around to the first question if we run out
-        current_index = 0 
-        
-    question_data = questions[current_index]
+    # Find the topic name associated with the selected question for the response model
+    selected_topic_name = "Mixed Topic" 
+    for topic_data in CURRICULUM[subject]:
+        if selected_question_data in topic_data["questions"]:
+             selected_topic_name = topic_data["topic"]
+             break
 
-    # 1. Prepare the response model
-    response_msg = KnowledgeResponse(
-        subject=msg.subject,
-        topic=topic_data["topic"],
-        question=question_data["question"],
-        answer=question_data["answer"],
-        explanation=question_data["explanation"]
+    # Build the response message
+    response = KnowledgeResponse(
+        subject=subject,
+        topic=selected_topic_name,
+        question=selected_question_data["question"],
+        answer=selected_question_data["answer"],
+        explanation=selected_question_data["explanation"],
     )
-
-    # 2. Update the index for the next request
-    ctx.storage.set("question_index", current_index + 1)
     
-    # 3. Send the response back to the Tutor Agent
-    await ctx.send(sender, response_msg)
-    ctx.logger.info(f"KNOWLEDGE AGENT: Sent question index {current_index} for topic: {topic_data['topic']} back to {sender}")
+    ctx.logger.info(f"Sending response for Topic: {response.topic}")
+    await ctx.send(sender, response)
 
 
 # --- MAIN EXECUTION ---
 if __name__ == "__main__":
+    # Save address for other agents
     with open("knowledge_address.txt", "w") as f:
         f.write(agent.address)
     agent.run()

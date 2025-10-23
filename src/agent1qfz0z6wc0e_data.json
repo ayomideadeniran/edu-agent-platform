@@ -3,57 +3,22 @@
     "agent1qddgfypwrksthknutu7pxxk4mkp86uma7g0lrxp8ae3wdx472qjxyxhzgp5": {
         "level": "Beginner",
         "subject": "Math",
-        "score": 1,
+        "score": 0,
         "history": [
             {
                 "topic": "Basic Arithmetic",
-                "correct": true,
-                "date": "2025-10-23T10:16:36.450810"
+                "correct": false,
+                "date": "2025-10-23T12:38:06.384169"
             },
             {
                 "topic": "Basic Arithmetic",
                 "correct": false,
-                "date": "2025-10-23T10:16:57.960791"
+                "date": "2025-10-23T12:38:17.747183"
             },
             {
                 "topic": "Basic Arithmetic",
                 "correct": false,
-                "date": "2025-10-23T10:17:13.627443"
-            },
-            {
-                "topic": "Basic Arithmetic",
-                "correct": false,
-                "date": "2025-10-23T10:17:59.067010"
-            },
-            {
-                "topic": "Basic Arithmetic",
-                "correct": false,
-                "date": "2025-10-23T10:18:20.183230"
-            },
-            {
-                "topic": "Basic Arithmetic",
-                "correct": false,
-                "date": "2025-10-23T10:18:54.485416"
-            },
-            {
-                "topic": "Basic Arithmetic",
-                "correct": false,
-                "date": "2025-10-23T10:19:52.403660"
-            },
-            {
-                "topic": "Basic Arithmetic",
-                "correct": false,
-                "date": "2025-10-23T10:20:04.519800"
-            },
-            {
-                "topic": "Basic Arithmetic",
-                "correct": false,
-                "date": "2025-10-23T10:20:18.244817"
-            },
-            {
-                "topic": "Basic Arithmetic",
-                "correct": false,
-                "date": "2025-10-23T10:21:01.661365"
+                "date": "2025-10-23T12:38:33.510645"
             }
         ],
         "current_question": null

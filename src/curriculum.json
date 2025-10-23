@@ -1,16 +1,344 @@
 {
-  "Math": {
-    "Beginner": [
-      {
-        "topic": "Basic Arithmetic",
-        "questions": [
-          {
-            "question": "What is 5 plus 3?",
-            "answer": "8",
-            "explanation": "Addition is the process of combining two or more numbers."
-          }
-        ]
-      }
+    "Math": [
+        {
+            "topic": "Basic Arithmetic",
+            "level": "Beginner",
+            "questions": [
+                {
+                    "question": "What is 7 + 5?",
+                    "answer": "12",
+                    "explanation": "Addition: Combining 7 and 5 gives 12."
+                },
+                {
+                    "question": "What is 15 - 8?",
+                    "answer": "7",
+                    "explanation": "Subtraction: The difference between 15 and 8 is 7."
+                },
+                {
+                    "question": "What is 3 multiplied by 9?",
+                    "answer": "27",
+                    "explanation": "Multiplication: 3 groups of 9 is 27."
+                },
+                {
+                    "question": "What is 20 divided by 4?",
+                    "answer": "5",
+                    "explanation": "Division: 20 split into 4 equal groups is 5 per group."
+                },
+                {
+                    "question": "What is the sum of 11 and 13?",
+                    "answer": "24",
+                    "explanation": "11 + 13 = 24."
+                },
+                {
+                    "question": "What is 100 - 45?",
+                    "answer": "55",
+                    "explanation": "The difference is 55."
+                },
+                {
+                    "question": "What is 6 * 7?",
+                    "answer": "42",
+                    "explanation": "Six times seven equals 42."
+                },
+                {
+                    "question": "What is the value of 50 / 10?",
+                    "answer": "5",
+                    "explanation": "Fifty divided by ten is five."
+                },
+                {
+                    "question": "If you have 12 apples and eat 5, how many are left?",
+                    "answer": "7",
+                    "explanation": "12 - 5 = 7."
+                },
+                {
+                    "question": "What is 4 * 4 * 4?",
+                    "answer": "64",
+                    "explanation": "4 times 4 is 16, and 16 times 4 is 64."
+                }
+            ]
+        },
+        {
+            "topic": "Algebraic Expressions and Geometry",
+            "level": "Intermediate",
+            "questions": [
+                {
+                    "question": "If x = 5, what is the value of 4x - 6?",
+                    "answer": "14",
+                    "explanation": "Substitute x=5: 4(5) - 6 = 20 - 6 = 14."
+                },
+                {
+                    "question": "Simplify the expression: 7a + 3b - 2a",
+                    "answer": "5a + 3b",
+                    "explanation": "Combine the 'a' terms: 7a - 2a = 5a."
+                },
+                {
+                    "question": "What is the area of a rectangle with length 10 and width 5?",
+                    "answer": "50",
+                    "explanation": "Area = Length * Width = 10 * 5 = 50 square units."
+                },
+                {
+                    "question": "What is the perimeter of a square with side length 8?",
+                    "answer": "32",
+                    "explanation": "Perimeter = 4 * side = 4 * 8 = 32 units."
+                },
+                {
+                    "question": "Solve for y: 2y + 1 = 9",
+                    "answer": "4",
+                    "explanation": "Subtract 1: 2y = 8. Divide by 2: y = 4."
+                },
+                {
+                    "question": "What is 2^5 (2 to the power of 5)?",
+                    "answer": "32",
+                    "explanation": "2 * 2 * 2 * 2 * 2 = 32."
+                },
+                {
+                    "question": "Simplify $\\frac{1}{2} + \\frac{1}{4}$ (as a decimal).",
+                    "answer": "0.75",
+                    "explanation": "The sum is $\\frac{3}{4}$, which is 0.75."
+                },
+                {
+                    "question": "What is the greatest common divisor (GCD) of 12 and 18?",
+                    "answer": "6",
+                    "explanation": "The largest number that divides both 12 and 18 is 6."
+                },
+                {
+                    "question": "What is the least common multiple (LCM) of 4 and 6?",
+                    "answer": "12",
+                    "explanation": "The smallest number divisible by both 4 and 6 is 12."
+                },
+                {
+                    "question": "How many degrees are in a straight line?",
+                    "answer": "180",
+                    "explanation": "A straight angle measures 180 degrees."
+                }
+            ]
+        }
+    ],
+    "History": [
+        {
+            "topic": "Ancient Civilizations",
+            "level": "Beginner",
+            "questions": [
+                {
+                    "question": "Which ancient civilization built the pyramids?",
+                    "answer": "Egyptians",
+                    "explanation": "The Ancient Egyptians built the great pyramids at Giza."
+                },
+                {
+                    "question": "The invention of the wheel is often attributed to which Mesopotamian civilization?",
+                    "answer": "Sumerians",
+                    "explanation": "The Sumerians are credited with many foundational inventions, including the wheel."
+                },
+                {
+                    "question": "Which river was central to the development of Ancient Egypt?",
+                    "answer": "Nile",
+                    "explanation": "The Nile River provided fertile soil and transportation."
+                },
+                {
+                    "question": "The city-state of Athens is known for pioneering what political system?",
+                    "answer": "Democracy",
+                    "explanation": "Athens is considered the birthplace of democracy."
+                },
+                {
+                    "question": "Who was the famous Roman general who declared himself dictator?",
+                    "answer": "Julius Caesar",
+                    "explanation": "Julius Caesar was assassinated after gaining immense power in the Roman Republic."
+                },
+                {
+                    "question": "What famous wall was built to protect China's northern border?",
+                    "answer": "Great Wall of China",
+                    "explanation": "It was built over centuries to defend against nomadic invaders."
+                },
+                {
+                    "question": "In which continent did the Inca civilization primarily exist?",
+                    "answer": "South America",
+                    "explanation": "The Incas had their vast empire in the Andes region of South America."
+                },
+                {
+                    "question": "What material did the Ancient Romans famously use to build long-lasting structures like the Pantheon?",
+                    "answer": "Concrete",
+                    "explanation": "Roman concrete was incredibly durable and enabled massive construction."
+                },
+                {
+                    "question": "What was the system of writing used by the Ancient Egyptians?",
+                    "answer": "Hieroglyphics",
+                    "explanation": "Hieroglyphics consisted of pictures and symbols."
+                },
+                {
+                    "question": "The Rosetta Stone was key to translating which ancient script?",
+                    "answer": "Hieroglyphics",
+                    "explanation": "The stone provided a parallel text in Greek, Demotic, and Hieroglyphics."
+                }
+            ]
+        },
+        {
+            "topic": "World Wars and Modern History",
+            "level": "Intermediate",
+            "questions": [
+                {
+                    "question": "What event is generally considered the start of World War I?",
+                    "answer": "Assassination of Archduke Franz Ferdinand",
+                    "explanation": "The assassination of Archduke Franz Ferdinand of Austria in Sarajevo in 1914 triggered the war."
+                },
+                {
+                    "question": "Which country bombed Pearl Harbor, leading the US to enter WWII?",
+                    "answer": "Japan",
+                    "explanation": "Japan attacked the US naval base at Pearl Harbor on December 7, 1941."
+                },
+                {
+                    "question": "Who was the leader of the Soviet Union during World War II?",
+                    "answer": "Joseph Stalin",
+                    "explanation": "Stalin led the Soviet Union from the mid-1920s until his death in 1953."
+                },
+                {
+                    "question": "The 'D-Day' invasion during WWII targeted the beaches of which region?",
+                    "answer": "Normandy",
+                    "explanation": "The Allied invasion of Normandy began on June 6, 1944."
+                },
+                {
+                    "question": "What term was used to describe the post-WWII geopolitical tension between the US and the USSR?",
+                    "answer": "Cold War",
+                    "explanation": "The Cold War was a conflict of ideologies without direct military action between the two superpowers."
+                },
+                {
+                    "question": "Who was the first person to step on the Moon?",
+                    "answer": "Neil Armstrong",
+                    "explanation": "Armstrong landed on the Moon during the Apollo 11 mission in 1969."
+                },
+                {
+                    "question": "The Berlin Wall separated which two political entities?",
+                    "answer": "East Germany and West Germany (or East Berlin and West Berlin)",
+                    "explanation": "The wall was a barrier separating communist East Germany from democratic West Germany."
+                },
+                {
+                    "question": "Which famous civil rights leader delivered the 'I Have a Dream' speech?",
+                    "answer": "Martin Luther King Jr.",
+                    "explanation": "The speech was delivered during the March on Washington for Jobs and Freedom in 1963."
+                },
+                {
+                    "question": "In which decade did the collapse of the Soviet Union occur?",
+                    "answer": "1990s (specifically 1991)",
+                    "explanation": "The Soviet Union officially dissolved in December 1991."
+                },
+                {
+                    "question": "The Renaissance began in which European country?",
+                    "answer": "Italy",
+                    "explanation": "The Renaissance began in cities like Florence, Italy, in the 14th century."
+                }
+            ]
+        }
+    ],
+    "Science": [
+        {
+            "topic": "States of Matter and Earth Science",
+            "level": "Beginner",
+            "questions": [
+                {
+                    "question": "What is water in its solid state called?",
+                    "answer": "Ice",
+                    "explanation": "Ice is the solid form of water, formed when the temperature drops below freezing."
+                },
+                {
+                    "question": "What state of matter has a definite volume but no definite shape?",
+                    "answer": "Liquid",
+                    "explanation": "Liquids take the shape of their container but maintain a constant volume."
+                },
+                {
+                    "question": "What planet is known as the 'Red Planet'?",
+                    "answer": "Mars",
+                    "explanation": "Mars gets its reddish color from iron oxide (rust) on its surface."
+                },
+                {
+                    "question": "What force keeps the planets in orbit around the sun?",
+                    "answer": "Gravity",
+                    "explanation": "Gravity is the attractive force between masses."
+                },
+                {
+                    "question": "Which gas do plants absorb from the atmosphere to perform photosynthesis?",
+                    "answer": "Carbon Dioxide",
+                    "explanation": "Plants use carbon dioxide and sunlight to create energy and release oxygen."
+                },
+                {
+                    "question": "What is the center of the Earth called?",
+                    "answer": "Core",
+                    "explanation": "The Earth's structure consists of the crust, mantle, and core."
+                },
+                {
+                    "question": "What is the process called when a liquid turns into a gas?",
+                    "answer": "Evaporation",
+                    "explanation": "Evaporation is a type of vaporization that occurs on the surface of a liquid."
+                },
+                {
+                    "question": "How many days does it take for the Earth to complete one full orbit around the Sun?",
+                    "answer": "365.25",
+                    "explanation": "This accounts for one year, plus the extra quarter day that leads to a leap year."
+                },
+                {
+                    "question": "What is the primary source of energy for the Earth?",
+                    "answer": "Sun",
+                    "explanation": "Solar energy drives almost all biological and weather processes."
+                },
+                {
+                    "question": "Which large celestial body orbits the Earth?",
+                    "answer": "Moon",
+                    "explanation": "The Moon is Earth's only natural satellite."
+                }
+            ]
+        },
+        {
+            "topic": "Basic Chemistry and Biology",
+            "level": "Intermediate",
+            "questions": [
+                {
+                    "question": "What is the chemical symbol for gold?",
+                    "answer": "Au",
+                    "explanation": "The symbol 'Au' comes from the Latin word for gold, 'aurum'."
+                },
+                {
+                    "question": "What is the simplest element, having only one proton?",
+                    "answer": "Hydrogen",
+                    "explanation": "Hydrogen ($\text{H}$) is the lightest and most abundant element in the universe."
+                },
+                {
+                    "question": "What is the chemical formula for water?",
+                    "answer": "H2O",
+                    "explanation": "Water is composed of two hydrogen atoms and one oxygen atom."
+                },
+                {
+                    "question": "What are the building blocks of proteins?",
+                    "answer": "Amino Acids",
+                    "explanation": "Proteins are long chains of various amino acids."
+                },
+                {
+                    "question": "Which organ pumps blood throughout the human body?",
+                    "answer": "Heart",
+                    "explanation": "The heart is a muscular organ responsible for circulating blood."
+                },
+                {
+                    "question": "What is the process by which living organisms produce their own food?",
+                    "answer": "Photosynthesis",
+                    "explanation": "Photosynthesis is used by plants and other organisms to convert light energy into chemical energy."
+                },
+                {
+                    "question": "What part of the cell controls all the cell's activities?",
+                    "answer": "Nucleus",
+                    "explanation": "The nucleus contains the cell's genetic material (DNA)."
+                },
+                {
+                    "question": "What is the process of breaking down food into nutrients called?",
+                    "answer": "Digestion",
+                    "explanation": "Digestion occurs primarily in the stomach and small intestine."
+                },
+                {
+                    "question": "What is the scientific term for a sugar?",
+                    "answer": "Carbohydrate (or Glucose/Saccharide)",
+                    "explanation": "Sugars are simple carbohydrates that provide energy."
+                },
+                {
+                    "question": "On the pH scale, what number represents a neutral substance (like pure water)?",
+                    "answer": "7",
+                    "explanation": "A pH of 7 is neutral; below 7 is acidic, and above 7 is basic."
+                }
+            ]
+        }
     ]
-  }
 }
