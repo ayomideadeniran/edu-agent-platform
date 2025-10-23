@@ -23,14 +23,11 @@ from uagents_core.contrib.protocols.chat import (
 )
 from uagents_core.models import Model
 
-# --- AGENT-SPECIFIC MODELS (Must match Tutor Agent) ---
-class HistoryQuery(TextContent):
-    type: str = "history_query"
-    query: str
-    
-class HistoryResponse(TextContent):
-    type: str = "history_response"
-    history_data: str 
+# --- AGENT SETUP ---
+# Initialize the protocol
+chat_proto = Protocol(spec=chat_protocol_spec)
+
+# The custom HistoryResponse model is REMOVED to bypass ChatMessage validation.
 
 # --- CONFIGURATION ---
 TUTOR_AGENT_ADDRESS = None 
@@ -50,17 +47,18 @@ agent = Agent(
 
 fund_agent_if_low(agent.wallet.address())
 
-chat_proto = Protocol(spec=chat_protocol_spec)
 
-
-# --- STATE TRACKING ---
-# 0: Waiting for initial session start acknowledgement
+# --- STATE TRACKING (Global Variables) ---
+# 0: Waiting for agent response
 # 1: Waiting for subject selection (Main Menu)
 # 2: Waiting for question answer
 # 3: Waiting for next action (after answer/feedback)
 CURRENT_STATE = 0 
 SUBJECT_OPTIONS = ["Math", "History", "Science"]
 CURRENT_QUESTION_TEXT = ""
+
+# FLAG TO ENSURE INPUT TASK IS STARTED ONLY ONCE (Critical Fix)
+INPUT_TASK_STARTED = False 
 
 
 # --- HELPER FUNCTIONS ---
@@ -71,6 +69,19 @@ def create_text_chat(text: str, content_model=TextContent) -> ChatMessage:
         timestamp=datetime.utcnow(),
         msg_id=uuid4(),
         content=[content_model(text=text)],
+    )
+
+def create_history_query(query: str) -> ChatMessage:
+    """
+    Creates a ChatMessage using plain TextContent, prepending a unique tag
+    for the Tutor Agent to recognize it as a history request.
+    """
+    # Use a unique, unlikely-to-be-typed prefix (e.g., ::HISTORY_REQUEST::)
+    history_request_text = f"::HISTORY_REQUEST::{query}"
+    return ChatMessage(
+        timestamp=datetime.utcnow(),
+        msg_id=uuid4(),
+        content=[TextContent(text=history_request_text)],
     )
 
 def print_menu():
@@ -87,6 +98,7 @@ def print_menu():
         print("Enter choice (1-3 or 0): ", end="", flush=True)
 
     elif CURRENT_STATE == 2: # Answer Input
+        # Note: CURRENT_QUESTION_TEXT is set by the message handler
         print(f"**Question:** {CURRENT_QUESTION_TEXT}")
         print("="*50)
         print("Enter your answer: ", end="", flush=True)
@@ -98,6 +110,10 @@ def print_menu():
         print("="*50)
         print("Enter choice (1 or 0): ", end="", flush=True)
 
+    elif CURRENT_STATE == 0:
+        print("Waiting for agent response...")
+
+
 # --- ASYNCHRONOUS USER INPUT TASK ---
 
 async def user_input_task(ctx: Context):
@@ -106,8 +122,7 @@ async def user_input_task(ctx: Context):
     """
     global CURRENT_STATE, SUBJECT_OPTIONS
     
-    # CRITICAL FIX: Add a pause to allow the agent to fully initialize
-    await asyncio.sleep(3) 
+    await asyncio.sleep(1) 
 
     print("Hello! Welcome to the agent education platform.")
     CURRENT_STATE = 1 # Move to main menu state
@@ -129,6 +144,8 @@ async def user_input_task(ctx: Context):
             if CURRENT_STATE == 1: # Subject Selection/Main Menu
                 if text == '0':
                     await ctx.send(TUTOR_AGENT_ADDRESS, create_history_query("check my history"))
+                    CURRENT_STATE = 0 
+                    print(f"\n[SYSTEM] Sending request for history...")
                 else:
                     try:
                         choice_index = int(text) - 1
@@ -137,7 +154,7 @@ async def user_input_task(ctx: Context):
                             ctx.logger.info(f"User chose subject: {subject}")
                             # Send subject choice to Tutor
                             await ctx.send(TUTOR_AGENT_ADDRESS, create_text_chat(subject))
-                            CURRENT_STATE = 0 # Wait for Tutor's question
+                            CURRENT_STATE = 0 
                             print(f"\n[SYSTEM] Sending request for {subject}...")
                         else:
                             print("[SYSTEM] Invalid choice. Please enter a number from the menu.")
@@ -150,17 +167,19 @@ async def user_input_task(ctx: Context):
                 ctx.logger.info(f"User submitted answer: {text}")
                 # Send answer as plain text to Tutor
                 await ctx.send(TUTOR_AGENT_ADDRESS, create_text_chat(text))
-                CURRENT_STATE = 0 # Wait for Tutor's feedback/next action menu
+                CURRENT_STATE = 0 
                 print(f"\n[SYSTEM] Sending answer...")
 
             elif CURRENT_STATE == 3: # Next Action
                 if text == '1':
                     # Send "next question" command to Tutor
                     await ctx.send(TUTOR_AGENT_ADDRESS, create_text_chat("next question"))
-                    CURRENT_STATE = 0 # Wait for Tutor's question
+                    CURRENT_STATE = 0 
                     print(f"\n[SYSTEM] Requesting next question...")
                 elif text == '0':
                     await ctx.send(TUTOR_AGENT_ADDRESS, create_history_query("check my history"))
+                    CURRENT_STATE = 0 
+                    print(f"\n[SYSTEM] Sending request for history...")
                 else:
                     print("[SYSTEM] Invalid choice. Please enter 1 or 0.")
                     print_menu()
@@ -179,9 +198,21 @@ async def user_input_task(ctx: Context):
 
 # --- AGENT EVENTS ---
 
+async def start_input_task_safely(ctx: Context):
+    """Safely starts the user input task using a global flag."""
+    global INPUT_TASK_STARTED
+    
+    if not INPUT_TASK_STARTED:
+        ctx.logger.info("Starting user input task *immediately* on agent startup...")
+        asyncio.create_task(user_input_task(ctx))
+        INPUT_TASK_STARTED = True
+
 @agent.on_event("startup")
 async def on_startup(ctx: Context):
+    """Sends the initial session message AND immediately launches the input task."""
     await send_initial_message(ctx)
+    await start_input_task_safely(ctx)
+
 
 async def send_initial_message(ctx: Context):
     """Initiates the conversation and session."""
@@ -200,25 +231,11 @@ async def send_initial_message(ctx: Context):
     await ctx.send(TUTOR_AGENT_ADDRESS, start_msg)
 
 
-# In src/student_agent.py, find and modify the start_user_input function:
-
-@agent.on_interval(period=1.0) # We use on_interval to start the task (backward compatibility)
-async def start_user_input(ctx: Context):
-    # Old buggy line: if not 'input_loop_started' in ctx.storage: 
-    
-    # CRITICAL FIX: Use .get() to safely check for the key, bypassing the iteration error
-    if ctx.storage.get('input_loop_started') is None: 
-        # Start the background task using an internal asyncio method
-        ctx.logger.info("Starting user input task...")
-        asyncio.create_task(user_input_task(ctx))
-        ctx.storage.set('input_loop_started', True)
-
-
 # --- CHAT PROTOCOL HANDLERS ---
 
 @chat_proto.on_message(model=ChatMessage) 
 async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
-    """Handles incoming chat messages from the Tutor Agent."""
+    """Handles incoming chat messages (Questions, Feedback, History) from the Tutor Agent."""
     
     global CURRENT_STATE, CURRENT_QUESTION_TEXT
     
@@ -226,17 +243,58 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
     await ctx.send(sender, ChatAcknowledgement(timestamp=datetime.utcnow(), acknowledged_msg_id=msg.msg_id))
 
     for item in msg.content:
-        # 2. Handle standard Text Content (This is where the question arrives)
-        if isinstance(item, TextContent) and not isinstance(item, HistoryResponse):
+        
+        # We only need to handle TextContent and StartSessionContent
+        if isinstance(item, TextContent):
             
             text = item.text
             ctx.logger.info(f"Text message from {sender}: {text}")
-            
+
+            # 🔥 CRITICAL FIX: Check if this TextContent is the JSON History response
+            if text.startswith("::HISTORY_RESPONSE::"):
+                json_data = text.replace("::HISTORY_RESPONSE::", "", 1)
+                
+                try:
+                    history_data = json.loads(json_data)
+                    
+                    print("\n" + "="*50)
+                    print(f"📊 **STUDENT PROGRESS HISTORY** 📜")
+                    print("="*50)
+                    print(f"  Current Level: {history_data.get('level', 'N/A')}")
+                    print(f"  Total Score:   {history_data.get('score', 'N/A')}")
+                    print("\n  --- Lesson History ---")
+                    
+                    if history_data.get("history"):
+                        for entry in history_data["history"]:
+                            status = "✅ CORRECT" if entry.get("correct") else "❌ INCORRECT"
+                            topic = entry.get('topic', 'Unknown Topic')
+                            # Ensure the date is formatted nicely
+                            date_part = entry.get('date', 'N/A').split('T')[0]
+                            print(f"    [{date_part}] {status:<10} - Topic: {topic}")
+                    else:
+                        print("    No practice questions answered yet.")
+                        
+                    print("="*50 + "\n")
+                
+                except json.JSONDecodeError:
+                    ctx.logger.error("Failed to decode history data from Tutor Agent.")
+                    print("\n[SYSTEM] Failed to display history due to data error.")
+                
+                # Return to the next action menu after showing history
+                CURRENT_STATE = 3 if CURRENT_QUESTION_TEXT else 1
+                print_menu()
+                return # Stop processing this TextContent
+
+            # Print the Tutor's response clearly (Only if it wasn't history)
+            print("\n" + "~"*50)
+            print(f"[TUTOR] {text}") 
+            print("~"*50)
+
             # CRITICAL: Identify if this is a question or feedback
             if "Question:" in text:
                 # Store the question text and move to ANSWER state
                 CURRENT_STATE = 2 
-                # Extract the question for the prompt (simple, non-robust extraction)
+                # Extract the question for the prompt (simple extraction)
                 question_start = text.find("Question:") + 10 
                 CURRENT_QUESTION_TEXT = text[question_start:].strip()
                 
@@ -244,45 +302,13 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
                 # This is feedback, move to NEXT ACTION state
                 CURRENT_STATE = 3
                 
-            # CRITICAL: Print the Tutor's response clearly
-            print("\n" + "~"*50)
-            print(f"[TUTOR] {text}") 
-            print("~"*50)
+            else:
+                # Fallback for introductory messages, go to main menu
+                CURRENT_STATE = 1 
             
             # Print the next menu/prompt
             print_menu()
             
-        # 3. Handle specialized History Response
-        elif isinstance(item, HistoryResponse):
-            try:
-                history_data = json.loads(item.history_data)
-                
-                print("\n" + "="*50)
-                print(f"📊 **STUDENT PROGRESS HISTORY** 📜")
-                print("="*50)
-                print(f"  Current Level: {history_data.get('level', 'N/A')}")
-                print(f"  Total Score:   {history_data.get('score', 'N/A')}")
-                print("\n  --- Lesson History ---")
-                
-                if history_data.get("history"):
-                    for entry in history_data["history"]:
-                        status = "✅ CORRECT" if entry.get("correct") else "❌ INCORRECT"
-                        topic = entry.get('topic', 'Unknown Topic')
-                        date = entry.get('date', 'N/A').split('T')[0]
-                        print(f"    [{date}] {status:<10} - Topic: {topic}")
-                else:
-                    print("    No practice questions answered yet.")
-                    
-                print("="*50 + "\n")
-                    
-            except json.JSONDecodeError:
-                ctx.logger.error("Failed to decode history data from Tutor Agent.")
-                print("\n[SYSTEM] Failed to display history due to data error.")
-            
-            # Return to the main menu after showing history
-            CURRENT_STATE = 1
-            print_menu()
-
     return None
 
 @chat_proto.on_message(model=ChatAcknowledgement)
@@ -300,3 +326,6 @@ if __name__ == "__main__":
         f.write(agent.address)
     
     agent.run()
+
+
+

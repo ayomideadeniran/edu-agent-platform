@@ -10,7 +10,7 @@ project_root = os.path.dirname(current_dir)
 if project_root not in sys.path:
     sys.path.append(project_root)
 
-# --- AGENT-SPECIFIC MODELS (Must match Tutor Agent) ---
+# --- AGENT-SPECIFIC MODELS ---
 class KnowledgeQuery(Model):
     subject: str
     level: str # e.g., 'Beginner', 'Intermediate'
@@ -120,7 +120,6 @@ async def handle_knowledge_query(ctx: Context, sender: str, msg: KnowledgeQuery)
     
     if not subject_data:
         ctx.logger.error(f"Subject '{msg.subject}' not found in curriculum.")
-        # Optionally send a failure response back to the Tutor if the subject is invalid
         return
 
     level_data = subject_data.get(msg.level)
@@ -128,15 +127,10 @@ async def handle_knowledge_query(ctx: Context, sender: str, msg: KnowledgeQuery)
         ctx.logger.error(f"Level '{msg.level}' not found for subject '{msg.subject}'.")
         return
 
-    # To send multiple questions, we need to know WHICH question to send.
-    # Since the Tutor Agent currently only sends a generic request, we will 
-    # **always select the first topic and the first question in that topic** # for simplicity in this demo.
-    
+    # Use the first topic for the selected subject/level for simplicity
     topic_data = level_data[0] 
     
-    # CRITICAL: We need a simple way to cycle questions if the student asks for 'next question'.
-    # We will use the agent's internal storage to track the index of the last question sent.
-    
+    # CRITICAL: Use the agent's internal storage to track the index of the last question sent.
     current_index = ctx.storage.get("question_index")
     if current_index is None:
         current_index = 0
@@ -144,7 +138,7 @@ async def handle_knowledge_query(ctx: Context, sender: str, msg: KnowledgeQuery)
     questions = topic_data["questions"]
     
     if current_index >= len(questions):
-        # Reset to the first question or move to the next topic (if logic existed)
+        # Wrap around to the first question if we run out
         current_index = 0 
         
     question_data = questions[current_index]
@@ -171,7 +165,3 @@ if __name__ == "__main__":
     with open("knowledge_address.txt", "w") as f:
         f.write(agent.address)
     agent.run()
-
-
-
-

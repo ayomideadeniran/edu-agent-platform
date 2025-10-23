@@ -16,14 +16,17 @@ from uagents.setup import fund_agent_if_low
 from uagents_core.contrib.protocols.chat import (
     ChatAcknowledgement,
     ChatMessage,
-    EndSessionContent,
     StartSessionContent,
     TextContent,
     chat_protocol_spec,
 )
 from uagents_core.models import Model
 
-# --- AGENT-SPECIFIC MODELS (Must match Knowledge Agent) ---
+# --- AGENT SETUP ---
+# Initialize the protocol
+chat_proto = Protocol(spec=chat_protocol_spec)
+
+# --- AGENT-SPECIFIC MODELS (Knowledge Agent Communication) ---
 class KnowledgeQuery(Model):
     subject: str
     level: str # e.g., 'Beginner', 'Intermediate'
@@ -35,16 +38,9 @@ class KnowledgeResponse(Model):
     answer: str
     explanation: str
 
-# These models are for communication with the Student Agent (History retrieval)
-class HistoryQuery(TextContent):
-    type: str = "history_query"
-    query: str
-    
-class HistoryResponse(TextContent):
-    type: str = "history_response"
-    history_data: str 
+# The custom HistoryResponse model is REMOVED to bypass ChatMessage validation.
 
-# --- GLOBAL VARIABLE FOR BUG WORKAROUND ---
+# --- GLOBAL VARIABLE FOR BUG WORKAROUND (Critical Fix) ---
 STUDENT_ADDRESS = None
 
 # --- CONFIGURATION ---
@@ -58,8 +54,8 @@ except FileNotFoundError:
     print("Knowledge Agent address file not found. Please run knowledge_agent.py first.")
 
 
-# Simplified "curriculum" to get available subjects (No need to load json now)
-CURRICULUM = {"Math"}
+# Simplified "curriculum" to get available subjects
+CURRICULUM = {"Math", "History", "Science"}
 
 
 # --- AGENT SETUP ---
@@ -72,7 +68,6 @@ agent = Agent(
 
 fund_agent_if_low(agent.wallet.address())
 
-chat_proto = Protocol(spec=chat_protocol_spec)
 
 # --- AGENT STATE MANAGEMENT ---
 def get_default_state(subject):
@@ -94,63 +89,44 @@ def create_text_chat(text: str, content_model=TextContent) -> ChatMessage:
         content=[content_model(text=text)],
     )
 
-def create_history_response(history_data: dict) -> ChatMessage:
-    """Creates a ChatMessage with the specialized HistoryResponse content."""
-    history_json = json.dumps(history_data)
-    return ChatMessage(
-        timestamp=datetime.utcnow(),
-        msg_id=uuid4(),
-        content=[HistoryResponse(text="Progress History", history_data=history_json)],
-    )
 
-# --- KNOWLEDGE RESPONSE HANDLER (FINAL, GUARANTEED DELIVERY FIX) ---
+# --- KNOWLEDGE RESPONSE HANDLER ---
 
 @agent.on_message(model=KnowledgeResponse) 
 async def handle_knowledge_response(ctx: Context, sender: str, msg: KnowledgeResponse):
     """
     Handles the response from the Knowledge Agent with a question.
-    
-    GUARANTEED FIX: Uses the global STUDENT_ADDRESS to bypass all storage key issues.
     """
     global STUDENT_ADDRESS
     
-    # 1. Validate the sender
     if sender != KNOWLEDGE_AGENT_ADDRESS:
         ctx.logger.warning(f"Received unexpected KnowledgeResponse from {sender}. Ignoring.")
         return
     
-    # 2. Get the student's address from the global variable
-    if not STUDENT_ADDRESS:
+    student_address = STUDENT_ADDRESS
+    if not student_address:
         ctx.logger.error("FATAL: KnowledgeResponse received but no student session address is set.")
         return
     
-    student_address = STUDENT_ADDRESS
     student_state = ctx.storage.get(student_address)
 
-    # Check that data exists for the student
     if not student_state:
         ctx.logger.error(f"FATAL: Student address {student_address} is set but no state data found.")
         return
     
-    # 3. Process the response and update state
-    
-    # Final check: Ensure the student is waiting for a question on the correct subject
-    if student_state.get('subject') != msg.subject or student_state.get('current_question') is not None:
-         ctx.logger.warning(f"Student {student_address} found but state is inconsistent (subject mismatch or question already set).")
-         return
-
+    # Process the response and update state
     student_state["current_question"] = msg.dict() # Store the question details
     ctx.storage.set(student_address, student_state)
     
     ctx.logger.info(f"Received question for {student_address}. Subject: {msg.subject}, Topic: {msg.topic}")
 
-    # 4. Build the lesson message
+    # Build the lesson message
     intro_message = f"Hello, I'm ready to teach **{msg.subject}**! Based on your level (**{student_state['level']}**), we'll start with the topic: **{student_state['current_question']['topic']}**."
     question_message = f"Here is your first question:\n\n**Question:** {student_state['current_question']['question']}"
 
     full_message = f"{intro_message}\n\n{question_message}"
     
-    # 5. Send the response back to the student
+    # Send the response back to the student
     await ctx.send(student_address, create_text_chat(full_message))
     ctx.logger.info(f"Sent lesson content to {student_address}")
 
@@ -180,20 +156,7 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
             ctx.storage.set(sender, get_default_state(subject=None))
             return
 
-        # --- 2. Handle HISTORY QUERY ---
-        elif isinstance(item, HistoryQuery):
-            ctx.logger.info(f"Received history query from {sender}: {item.query}")
-            
-            if not student_state:
-                await ctx.send(sender, create_text_chat("I cannot find your session data. Please start a subject first."))
-                return
-
-            history_message = create_history_response(student_state)
-            await ctx.send(sender, history_message)
-            ctx.logger.info(f"Sent history response to {sender}")
-            return
-        
-        # --- 3. Handle TEXT CONTENT (Initial Subject or Answer/Reply) ---
+        # --- 2. Handle TEXT CONTENT (Initial Subject, Answer/Reply, or HISTORY REQUEST) ---
         elif isinstance(item, TextContent):
             
             if not student_state:
@@ -203,6 +166,22 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
             text = item.text.strip()
             ctx.logger.info(f"Received text from {sender}: '{text}'")
             
+            # 🔥 HISTORY CHECK: If the text contains the unique request prefix
+            if text.startswith("::HISTORY_REQUEST::"):
+                ctx.logger.info(f"Received HISTORY_REQUEST from {sender}.")
+                
+                if not student_state:
+                    await ctx.send(sender, create_text_chat("I cannot find your session data. Please start a subject first."))
+                    return
+
+                # --- CRITICAL FIX: Send history as JSON embedded in TextContent ---
+                history_json = json.dumps(student_state)
+                history_message_text = f"::HISTORY_RESPONSE::{history_json}"
+                
+                await ctx.send(sender, create_text_chat(history_message_text))
+                ctx.logger.info(f"Sent history response (as JSON Text) to {sender}")
+                return # Stop processing here
+
             # A. First Message: Subject Selection (Subject is None)
             if student_state.get('subject') is None:
                 subject = text
