@@ -1,40 +1,131 @@
-# Personalized Education & Tutoring Agent
+# 🎓 Educational AI Agent System
 
-![tag:innovationlab](https://img.shields.io/badge/innovationlab-3D8BD3)
-![tag:hackathon](https://img.shields.io/badge/hackathon-5F43F1)
+## ASI Agents Track Submission
 
-This project implements a multi-agent system for personalized education, built with the uAgents framework.
+This project demonstrates a fully functional, three-agent educational tutoring system built using the **Fetch.ai `uAgents` framework**. It leverages the SingularityNET **`MeTTa` knowledge graph** for structured, subject-specific knowledge retrieval, and utilizes the **Chat Protocol** to ensure compatibility with the ASI:One interface.
 
-## Architecture
+### Project Overview
 
-The system consists of three agents:
+The system operates using a clear separation of concerns across three autonomous agents:
 
-1.  **Student Agent (`student_agent.py`):** Simulates a student interacting with the tutoring system. It engages in a conversation with the Tutor Agent.
-2.  **Tutor Agent (`tutor_agent.py`):** The main educational agent. It receives messages from the student, queries the Knowledge Agent for the student's profile, and provides a personalized response.
-3.  **Knowledge Agent (`knowledge_agent.py`):** Manages the student's knowledge profile using a MeTTa knowledge graph. It stores and retrieves information about the student's learning progress.
+| Agent Name | Role | Technology Used |
+| :--- | :--- | :--- |
+| **Student Agent** | **User Interface (CLI):** Handles session initiation, user input (subject/level choices, answers), and displays the Tutor's questions and feedback. | `uAgents`, `Chat Protocol` |
+| **Tutor Agent** | **Central Coordinator:** Manages the user's session state (history), routes queries to the Knowledge Agent, and grades the user's answers. | `uAgents`, `Chat Protocol`, State Management |
+| **Knowledge Agent** | **Knowledge Base:** Serves questions and answers based on specific Subject/Level queries by querying the structured `curriculum.metta` file using `MeTTa`. | `uAgents`, `MeTTa` (`hyperon`), Knowledge Graph |
 
-## How to Run
+### Required Submission Badges
 
-To run the system, you need to start the agents in the following order:
+The agents are categorized under Innovation Lab and are part of the Hackathon:
 
-1.  **Start the Knowledge Agent:**
+### Setup and Running Instructions
 
+This guide assumes you have **Python 3.9+** and have initialized a virtual environment (`venv`).
+
+**1. Clone the Repository**
+
+```bash
+git clone https://github.com/ayomideadeniran/edu-agent-platform
+cd edu-agent-platform/src 
+```
+
+**2. Install Dependencies**
+
+This project requires `uagents` for agent communication and `hyperon` for MeTTa integration:
+
+```bash
+pip install uagents hyperon
+```
+
+**3. Agent Addresses**
+
+The three agents communicate using pre-determined addresses, which are written to local files on startup. Please ensure the following files exist in the `src` directory with the most recently generated addresses:
+
+  * **Tutor Agent Address:** `tutor_address.txt`
+  * **Knowledge Agent Address:** `knowledge_address.txt`
+  * **Student Agent Address:** `student_address.txt`
+
+For the judges' reference, the expected addresses for the agents are:
+
+  * **Tutor Agent:** `agent1qfz0z6wc0ep8ser24qssdf3dtkln4lyzvvutr0zwj0kv0h74w6r8yhe7kyt`
+  * **Knowledge Agent:** `agent1q0n0gf3nm2mevkj6mm45cmjvm3sx23glx38sdmn4kjmw8xm4stn2q600dnq`
+  * **Student Agent:** `agent1qddgfypwrksthknutu7pxxk4mkp86uma7g0lrxp8ae3wdx472qjxyxhzgp5`
+
+**4. Run Agents (In Order)**
+
+Run each agent in a separate terminal window, ensuring the `venv` is activated for all sessions:
+
+| Terminal | Command | Role |
+| :--- | :--- | :--- |
+| **Terminal 1** | `python knowledge_agent.py` | Starts the MeTTa knowledge base. |
+| **Terminal 2** | `python tutor_agent.py` | Starts the central coordinator/grader. |
+| **Terminal 3** | `python student_agent.py` | Starts the user interface (CLI). |
+
+**5. Interaction**
+
+Once all three agents are running, interact with the platform via **Terminal 3** (`student_agent.py`). Follow the menu prompts to:
+
+1.  Select a subject (Math, History, Science).
+2.  Select a difficulty level (Beginner, Intermediate).
+3.  Answer the question.
+4.  Use the `[0] Check My History` option to view the Tutor Agent's grading and session history.
+
+### Use of ASI Alliance Technology
+
+| Technology | Implementation in Project |
+| :--- | :--- | :--- |
+| **`uAgents` Framework** | Forms the foundation of the entire architecture. Used for all inter-agent communication, agent state management, and defining clear protocols. |
+| **`MeTTa` Knowledge Graph** | Integrated into the `knowledge_agent.py` to query the `curriculum.metta` file. We use a robust `(question ...)` fact structure for reliable, subject/level-based retrieval. |
+| **Chat Protocol** | Implemented in the `student_agent.py` and `tutor_agent.py` to handle all user interactions, ensuring the application is compatible with the Agentverse and ASI:One interface for seamless human-agent interaction. |
+
+---
+
+## 1. Creating the Virtual Environment (One-Time Setup)
+
+You typically do this step only once per project.
+
+1.  **Navigate** to your project directory:
     ```bash
-    python src/knowledge_agent.py
+    cd ~/Documents/Project/ASI-Agents-Track/edu-agent-platform/src
     ```
-
-2.  **Start the Tutor Agent:**
-
+2.  **Create the environment:** This command tells Python to create a virtual environment named `venv` inside your current directory.
     ```bash
-    python src/tutor_agent.py
+    python -m venv venv
     ```
+      * *Note: If you are on an older system, you might need to use `python3` instead of `python`.*
 
-3.  **Start the Student Agent:**
+---
 
-    ```bash
-    python src/student_agent.py
-    ```
+## 2. Activating the Virtual Environment
 
-## Agent Addresses
+You must do this step **every time** you open a new terminal session for your project.
 
-When the `knowledge_agent.py` and `tutor_agent.py` are run, they will create `knowledge_address.txt` and `tutor_address.txt` files respectively. These files contain the agents' addresses, which are used by the other agents to communicate.
+To activate the environment:
+
+```bash
+source venv/bin/activate
+```
+
+### How to Confirm Activation
+
+After running the command above, your terminal prompt will change to show the name of the environment in parentheses. In your case, it will look like this:
+
+```bash
+(venv) knights@knights-VivoBook-ASUSLaptop-X420UA:~/Documents/Project/ASI-Agents-Track/edu-agent-platform/src$
+```
+
+### Why Use `venv`?
+
+A virtual environment ensures that the Python packages you install for your project (like `uagents` and `hyperon`) are isolated from the rest of your system's Python packages. This prevents conflicts and keeps your project dependencies clean.
+
+---
+
+## 3. Deactivating the Virtual Environment
+
+When you are finished working on this project in your current terminal window, you can exit the virtual environment using the command:
+
+```bash
+deactivate
+```
+
+Your terminal prompt will return to its normal state, and any subsequent `pip install` commands will affect your global Python environment (which is usually what you want to avoid).
