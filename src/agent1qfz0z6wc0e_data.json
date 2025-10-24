@@ -2,25 +2,11 @@
     "student_id": "agent1qddgfypwrksthknutu7pxxk4mkp86uma7g0lrxp8ae3wdx472qjxyxhzgp5",
     "agent1qddgfypwrksthknutu7pxxk4mkp86uma7g0lrxp8ae3wdx472qjxyxhzgp5": {
         "level": "Beginner",
-        "subject": "Math",
+        "subject": null,
         "score": 0,
-        "history": [
-            {
-                "topic": "Basic Arithmetic",
-                "correct": false,
-                "date": "2025-10-23T12:38:06.384169"
-            },
-            {
-                "topic": "Basic Arithmetic",
-                "correct": false,
-                "date": "2025-10-23T12:38:17.747183"
-            },
-            {
-                "topic": "Basic Arithmetic",
-                "correct": false,
-                "date": "2025-10-23T12:38:33.510645"
-            }
-        ],
+        "history": [],
         "current_question": null
-    }
+    },
+    "last_student_query_addr": "agent1qddgfypwrksthknutu7pxxk4mkp86uma7g0lrxp8ae3wdx472qjxyxhzgp5",
+    "active_question_data_agent1qddgfypwrksthknutu7pxxk4mkp86uma7g0lrxp8ae3wdx472qjxyxhzgp5": null
 }
