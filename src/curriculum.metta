@@ -1,51 +1,21 @@
-;; --- CRITICAL FINAL ATTEMPT STRUCTURE ---
+;; --- DATA SECTION ---
 
-;; Math - Beginner - Addition
-(current-context
-	(: subject "Math")
-	(: level "Beginner")
-	(: topic "Addition Basics")
-	(has-question q_math_b_add_1 "What is 2 + 3?")
-	(has-answer q_math_b_add_1 "5")
-	(has-explanation q_math_b_add_1 "2 plus 3 equals 5.")
-)
+;; History - Intermediate
+(question "History" "Intermediate" "Ancient Civilizations" "Which river was essential to the civilization of ancient Egypt?" "Nile" "The Nile River provided fertile soil for agriculture and served as a major transportation route.")
+(question "History" "Intermediate" "Ancient Civilizations" "What was the primary purpose of the Great Wall of China?" "Defense" "The Great Wall was built over centuries to protect Chinese states and empires against raids and invasions.")
 
-;; Math - Beginner - Subtraction
-(current-context
-	(: subject "Math")
-	(: level "Beginner")
-	(: topic "Subtraction Basics")
-	(has-question q_math_b_sub_1 "If you have 5 apples and eat 2, how many are left?")
-	(has-answer q_math_b_sub_1 "3")
-	(has-explanation q_math_b_sub_1 "If you have 5 and remove 2, 3 remain.")
-)
+;; Science - Intermediate
+(question "Science" "Intermediate" "Ecology" "What is the process by which plants make their own food?" "Photosynthesis" "Photosynthesis uses sunlight, water, and carbon dioxide to create glucose and oxygen.")
 
-;; Math - Intermediate - Multiplication
-(current-context
-	(: subject "Math")
-	(: level "Intermediate")
-	(: topic "Multiplication")
-	(has-question q_math_i_mul_1 "Calculate 7 multiplied by 4.")
-	(has-answer q_math_i_mul_1 "28")
-	(has-explanation q_math_i_mul_1 "7 times 4 is 28.")
-)
+;; Math - Beginner
+(question "Math" "Beginner" "Addition Basics" "What is 2 + 3?" "5" "2 plus 3 equals 5.")
+(question "Math" "Beginner" "Subtraction Basics" "If you have 5 apples and eat 2, how many are left?" "3" "If you have 5 and remove 2, 3 remain.")
 
 ;; History - Beginner
-(current-context
-	(: subject "History")
-	(: level "Beginner")
-	(: topic "Ancient Egypt")
-	(has-question q_hist_b_ae_1 "Which large structures were built by the ancient Egyptians?")
-	(has-answer q_hist_b_ae_1 "Pyramids")
-	(has-explanation q_hist_b_ae_1 "The ancient Egyptians built pyramids as tombs for pharaohs.")
-)
+(question "History" "Beginner" "Ancient Egypt" "Which large structures were built by the ancient Egyptians?" "Pyramids" "The ancient Egyptians built pyramids as tombs for pharaohs.")
+
+;; Math - Intermediate
+(question "Math" "Intermediate" "Multiplication" "Calculate 7 multiplied by 4." "28" "7 times 4 is 28.")
 
 ;; Science - Beginner
-(current-context
-	(: subject "Science")
-	(: level "Beginner")
-	(: topic "The Solar System")
-	(has-question q_sci_b_solar_1 "Which star is at the center of our solar system?")
-	(has-answer q_sci_b_solar_1 "The Sun")
-	(has-explanation q_sci_b_solar_1 "The Sun is the central star around which the planets orbit.")
-)
+(question "Science" "Beginner" "The Solar System" "Which star is at the center of our solar system?" "The Sun" "The Sun is the central star around which the planets orbit.")

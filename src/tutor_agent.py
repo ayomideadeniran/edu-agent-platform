@@ -8,6 +8,7 @@ from uagents.setup import fund_agent_if_low
 # Import the shared models
 # Ensure models.py defines KnowledgeQuery and KnowledgeResponse
 try:
+    # Assuming models.py is in the project root
     from models import KnowledgeQuery, KnowledgeResponse
 except ImportError:
     print("Error: models.py not found or doesn't contain required models.")
@@ -104,7 +105,7 @@ async def handle_student_chat_message(ctx: Context, sender: str, msg: ChatMessag
                     'level': level,
                     'sender': sender
                 }
-                # Save the student sender for the response handler
+                # Store the student sender for the response handler
                 ctx.storage.set('last_student_query_addr', sender)
                 ctx.logger.info("Query saved to PENDING_QUERY state.")
                 return
@@ -117,7 +118,7 @@ async def handle_student_chat_message(ctx: Context, sender: str, msg: ChatMessag
                 ctx.logger.info("Special History Command acknowledged.")
                 return
 
-            # --- 4. Final Fallback: Treat everything else as an Answer Submission (GRADING) ---
+            # --- 4. Handle Answer Submission (GRADING) ---
 
             user_answer = text
             user_answer_normalized = text.strip().lower()
@@ -126,24 +127,33 @@ async def handle_student_chat_message(ctx: Context, sender: str, msg: ChatMessag
             active_data_key = f"active_question_data_{sender}"
             active_data = ctx.storage.get(active_data_key)
 
-            if active_data:
+            if active_data and active_data.get('question'):
                 # We have an active question for this student. Grade it.
-                correct_answer_normalized = active_data['correct_answer'].strip().lower()
+                
+                # Retrieve question details
+                correct_answer = active_data.get('correct_answer', '').strip()
+                correct_answer_normalized = correct_answer.lower()
+                topic = active_data.get('topic', 'N/A')
+                explanation = active_data.get('explanation', '')
 
+                # --- GRADING LOGIC ---
                 is_correct = user_answer_normalized == correct_answer_normalized
 
                 if is_correct:
                     feedback = "That is **CORRECT**! 🎉"
                 else:
                     # Provide the correct answer for learning
-                    feedback = f"That is **INCORRECT**. The correct answer was **{active_data['correct_answer']}**. 😔"
+                    feedback = f"That is **INCORRECT**. The correct answer was **{correct_answer}**. 😔"
+                
+                if explanation:
+                    feedback += f" **Hint/Explanation:** {explanation}"
 
                 # --- HISTORY PAYLOAD CREATION ---
                 history_data = {
-                    'topic': active_data['topic'],
+                    'topic': topic,
                     'question': active_data['question'],
                     'user_answer': user_answer,
-                    'correct_answer': active_data['correct_answer'],
+                    'correct_answer': correct_answer,
                     'is_correct': is_correct
                 }
 
@@ -154,9 +164,9 @@ async def handle_student_chat_message(ctx: Context, sender: str, msg: ChatMessag
                 await ctx.send(sender, create_text_chat(history_payload))
                 ctx.logger.info(f"Answer received and graded. Sent history payload.")
 
-                # Clear the active question data after grading
-                ctx.storage.set(active_data_key, None) # Use pop to remove
-
+                # Clear the active question data after grading (FIX for KeyValueStore TypeError)
+                ctx.storage.set(active_data_key, None) 
+            
             else:
                 # Generic acknowledgment for submissions outside of an active question flow
                 confirmation_text = "Input received, but no active question was found. Please select a new subject/level from the menu to start a lesson."
@@ -215,11 +225,12 @@ async def handle_knowledge_response(ctx: Context, sender: str, msg: KnowledgeRes
 
     # 1. Store the question data for grading in the next turn
     # Ensure all expected fields are present in the response
-    if msg.topic and msg.question and hasattr(msg, 'answer'): # Use 'answer', not 'correct_answer' based on models.py
+    if msg.topic and msg.question and hasattr(msg, 'answer'):
         active_question_data = {
             'topic': msg.topic,
             'question': msg.question,
-            'correct_answer': msg.answer, # Store the answer as provided for history
+            'correct_answer': msg.answer, # Store the answer as provided for grading
+            'explanation': getattr(msg, 'explanation', ''), # Store explanation if available
             'subject': msg.subject,
             'level': msg.level,
         }
@@ -253,7 +264,3 @@ if __name__ == "__main__":
     with open("tutor_address.txt", "w") as f:
         f.write(agent.address)
     agent.run()
-
-
-
-
