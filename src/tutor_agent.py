@@ -6,10 +6,9 @@ from uagents import Agent, Context, Protocol, Model
 from uagents.setup import fund_agent_if_low
 
 # Import the shared models
-# Ensure models.py defines KnowledgeQuery and KnowledgeResponse
+# Ensure models.py defines KnowledgeQuery, KnowledgeResponse, AssessmentRequest, and AssessmentResponse
 try:
-    # Assuming models.py is in the project root
-    from models import KnowledgeQuery, KnowledgeResponse
+    from models import KnowledgeQuery, KnowledgeResponse, AssessmentRequest, AssessmentResponse # <-- UPDATED
 except ImportError:
     print("Error: models.py not found or doesn't contain required models.")
     sys.exit(1)
@@ -31,14 +30,14 @@ if project_root not in sys.path:
 
 
 # --- AGENT SETUP ---
+AGENT_NAME = "tutor_agent"
 agent = Agent(
-    name="tutor_agent",
+    name=AGENT_NAME,
     port=8001,
-    seed="tutor_agent_seed_phrase",
-    endpoint=["http://127.0.0.1:8001/submit"],
+    seed=f"{AGENT_NAME}_seed_phrase",
+    endpoint=[f"http://127.0.0.1:8001/submit"],
 )
 
-# Fix: Use address() method
 fund_agent_if_low(agent.wallet.address())
 
 # Define protocols
@@ -46,20 +45,37 @@ tutor_protocol = Protocol(name="Tutor", version="0.1")
 chat_proto = Protocol(spec=chat_protocol_spec)
 
 # --- GLOBAL VARIABLES & CONFIGURATION ---
+
+# 1. Knowledge Agent Address (Existing)
 KNOWLEDGE_AGENT_ADDRESS = None
 try:
     with open("knowledge_address.txt", "r") as f:
         KNOWLEDGE_AGENT_ADDRESS = f.read().strip()
 except FileNotFoundError:
     print("FATAL: knowledge_address.txt not found. Please run knowledge_agent.py first.")
-    KNOWLEDGE_AGENT_ADDRESS = "" # Set to empty to prevent errors if file missing
+    KNOWLEDGE_AGENT_ADDRESS = "" 
+
+# 2. AI Assessment Agent Configuration (NEW)
+AI_ASSESSMENT_AGENT_ADDRESS_FILE = "ai_assessment_address.txt"
+AI_ASSESSMENT_AGENT_ADDRESS = None
+PENDING_ASSESSMENT_SENDER = None  # State for tracking which student requested the assessment
+
+try:
+    with open(AI_ASSESSMENT_AGENT_ADDRESS_FILE, "r") as f:
+        AI_ASSESSMENT_AGENT_ADDRESS = f.read().strip()
+    print(f"Loaded AI Assessment Agent address: {AI_ASSESSMENT_AGENT_ADDRESS}")
+except FileNotFoundError:
+    AI_ASSESSMENT_AGENT_ADDRESS = "agent1q..." # Placeholder address for startup
+    print("FATAL: ai_assessment_address.txt not found. Please run ai_assessment_agent.py first.")
+
 
 # Global state to manage the conversation flow (used by on_interval)
 PENDING_QUERY = {}
 
-# Available curriculum (used for validation)
+# Available curriculum (used for validation and AI constraints)
 AVAILABLE_SUBJECTS = ["Math", "History", "Science"]
 AVAILABLE_LEVELS = ["Beginner", "Intermediate"]
+
 
 # --- HELPER FUNCTIONS ---
 
@@ -78,9 +94,9 @@ async def handle_acknowledgement(ctx: Context, sender: str, msg: ChatAcknowledge
 @chat_proto.on_message(model=ChatMessage)
 async def handle_student_chat_message(ctx: Context, sender: str, msg: ChatMessage):
     """
-    Handles generic ChatMessages from the Student Agent (session start, curriculum query, or answer submission).
+    Handles generic ChatMessages from the Student Agent (session start, curriculum query, answer submission, or assessment request).
     """
-    global PENDING_QUERY
+    global PENDING_QUERY, PENDING_ASSESSMENT_SENDER
 
     # 1. Acknowledge the message (always)
     await ctx.send(sender, ChatAcknowledgement(acknowledged_msg_id=msg.msg_id, timestamp=datetime.utcnow()))
@@ -93,7 +109,28 @@ async def handle_student_chat_message(ctx: Context, sender: str, msg: ChatMessag
             if not text:
                 return
 
-            # --- 2. Check for the Subject:Level pattern (a NEW CURRICULUM QUERY) ---
+            # --- NEW: Check for Assessment Request Command (::ASSESSMENT_REQUEST::) ---
+            if text.startswith("::ASSESSMENT_REQUEST::"):
+                challenge_text = text.split("::ASSESSMENT_REQUEST::", 1)[-1].strip()
+                
+                # 1. Store state and sender
+                PENDING_ASSESSMENT_SENDER = sender 
+                
+                # 2. Forward structured request to AI Assessment Agent
+                assessment_msg = AssessmentRequest(user_challenges=challenge_text)
+                await ctx.send(AI_ASSESSMENT_AGENT_ADDRESS, assessment_msg)
+                
+                ctx.logger.info(f"Forwarded assessment request to AI Agent.")
+                
+                # Inform the Student Agent that analysis is in progress
+                await ctx.send(
+                    sender, 
+                    create_text_chat(f"[SYSTEM] Analyzing your challenges with the AI... This may take a moment.")
+                )
+                return
+
+
+            # --- 2. Check for the Subject:Level pattern (a NEW CURRICULUM QUERY) (Existing) ---
             if ":" in text and text.count(':') == 1:
                 parts = text.split(":", 1)
                 subject = parts[0].strip()
@@ -110,7 +147,7 @@ async def handle_student_chat_message(ctx: Context, sender: str, msg: ChatMessag
                 ctx.logger.info("Query saved to PENDING_QUERY state.")
                 return
 
-            # --- 3. Check for the Special History Command (::HISTORY_REQUEST::) ---
+            # --- 3. Check for the Special History Command (::HISTORY_REQUEST::) (Existing) ---
             if text.startswith("::HISTORY_REQUEST::"):
                 # Acknowledge the command and prompt student to use menu
                 history_ack_msg = "History request acknowledged. Please check your Student Agent console for local history."
@@ -118,7 +155,8 @@ async def handle_student_chat_message(ctx: Context, sender: str, msg: ChatMessag
                 ctx.logger.info("Special History Command acknowledged.")
                 return
 
-            # --- 4. Handle Answer Submission (GRADING) ---
+            # --- 4. Handle Answer Submission (GRADING) (Existing) ---
+            # ... (Existing grading logic remains the same) ...
 
             user_answer = text
             user_answer_normalized = text.strip().lower()
@@ -164,7 +202,7 @@ async def handle_student_chat_message(ctx: Context, sender: str, msg: ChatMessag
                 await ctx.send(sender, create_text_chat(history_payload))
                 ctx.logger.info(f"Answer received and graded. Sent history payload.")
 
-                # Clear the active question data after grading (FIX for KeyValueStore TypeError)
+                # Clear the active question data after grading
                 ctx.storage.set(active_data_key, None) 
             
             else:
@@ -181,7 +219,60 @@ async def handle_student_chat_message(ctx: Context, sender: str, msg: ChatMessag
         await ctx.send(sender, create_text_chat(welcome_msg))
         return
 
-# --- KNOWLEDGE AGENT COMMUNICATION (INTERVAL & HANDLER) ---
+# --- AI ASSESSMENT RESPONSE HANDLER (NEW) ---
+
+@tutor_protocol.on_message(model=AssessmentResponse)
+async def handle_assessment_response(ctx: Context, sender: str, msg: AssessmentResponse):
+    """
+    Handles the structured recommendation from the AI Assessment Agent.
+    Includes validation logic as a safety net.
+    """
+    global PENDING_ASSESSMENT_SENDER
+    
+    # 1. Verify response is from the expected AI agent and we have a student waiting
+    if sender != AI_ASSESSMENT_AGENT_ADDRESS or PENDING_ASSESSMENT_SENDER is None:
+        ctx.logger.warning(f"Received unexpected AssessmentResponse from {sender}. Ignoring.")
+        return
+    
+    student_address = PENDING_ASSESSMENT_SENDER
+    PENDING_ASSESSMENT_SENDER = None # Clear state
+
+    # --- 2. VALIDATION CHECK (Layer 2 Safety Net) ---
+    recommended_subject = msg.recommendation_subject
+    recommended_level = msg.recommendation_level
+    original_summary = msg.analysis_summary
+    
+    if recommended_subject not in AVAILABLE_SUBJECTS or recommended_level not in AVAILABLE_LEVELS:
+        # Fallback if the AI suggests an unsupported subject/level
+        recommended_subject = "Science"
+        recommended_level = "Beginner"
+        
+        final_summary = (
+            f"The AI suggested a topic ({msg.recommendation_subject}:{msg.recommendation_level}) "
+            f"which is not currently available in the curriculum. Defaulting to: **Science: Beginner**.\n"
+            f"Original AI Summary: {original_summary}"
+        )
+        ctx.logger.warning("AI suggested unsupported subject. Falling back to default.")
+    else:
+        final_summary = original_summary 
+    # -----------------------------------------------
+
+    # 3. Format and send the recommendation back to the student
+    recommendation_text = (
+        f"**✅ AI Recommendation Received!**\n\n"
+        f"**AI Analysis:** {final_summary}\n\n"
+        f"**Suggested Lesson:** {recommended_subject}: {recommended_level}\n\n"
+        f"To start this lesson, type the exact suggestion (e.g., '{recommended_subject}:{recommended_level}') or select a different option from the menu."
+    )
+
+    # We send a special command back so the Student Agent can identify and process this
+    recommendation_command = f"::AI_RECOMMENDATION::{recommended_subject}:{recommended_level}::{recommendation_text}"
+
+    await ctx.send(student_address, create_text_chat(recommendation_command))
+    ctx.logger.info(f"Relayed AI recommendation (validated) to Student: {recommended_subject}:{recommended_level}")
+
+
+# --- KNOWLEDGE AGENT COMMUNICATION (INTERVAL & HANDLER) (Existing) ---
 
 @agent.on_interval(period=1.0)
 async def check_pending_query(ctx: Context):

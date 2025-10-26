@@ -22,7 +22,7 @@ from uagents_core.contrib.protocols.chat import (
     chat_protocol_spec,
 )
 # Use shared models
-from models import KnowledgeQuery, KnowledgeResponse
+from models import KnowledgeQuery, KnowledgeResponse, AssessmentRequest # Added AssessmentRequest for completeness
 
 
 # --- AGENT SETUP ---
@@ -51,15 +51,15 @@ fund_agent_if_low(agent.wallet.address())
 # 0: Waiting for agent response
 # 1: Waiting for subject selection (Main Menu)
 # 1.5: Waiting for level selection
+# 1.8: Waiting for challenge input (NEW: AI Assessment)
 # 2: Waiting for question answer
-# 3: Waiting for next action (after answer/feedback)
+# 3: Waiting for next action (after answer/feedback/history)
 CURRENT_STATE = 0 
 SUBJECT_OPTIONS = ["Math", "History", "Science"]
 LEVEL_OPTIONS = ["Beginner", "Intermediate"] 
 CURRENT_QUESTION_TEXT = ""
 INPUT_TASK_STARTED = False 
 TEMP_SUBJECT = None 
-# FIX 1: New Global Variable for History
 STUDENT_HISTORY = [] 
 
 
@@ -81,18 +81,29 @@ def create_history_query(query: str) -> ChatMessage:
         content=[TextContent(text=history_request_text)],
     )
 
+# NEW: Helper function to create the assessment request command
+def create_assessment_request(challenges: str) -> ChatMessage:
+    assessment_request_text = f"::ASSESSMENT_REQUEST::{challenges}"
+    return ChatMessage(
+        timestamp=datetime.utcnow(),
+        msg_id=uuid4(),
+        content=[TextContent(text=assessment_request_text)],
+    )
+
 def print_menu():
     global CURRENT_STATE
     print("\n" + "="*50)
     
-    if CURRENT_STATE == 1: # Subject Selection
-        print("Please choose a subject by pressing the corresponding number:")
+    if CURRENT_STATE == 1: # Subject Selection/Main Menu
+        print("Please choose an option by pressing the corresponding number:")
         for i, subject in enumerate(SUBJECT_OPTIONS):
             print(f"  [{i+1}] {subject}")
+        # NEW OPTION
+        print(f"  [{len(SUBJECT_OPTIONS) + 1}] Dyslexia Assessment (AI)") 
         print("  [0] Check My History")
         print("  [q] Quit Session") 
         print("="*50)
-        print("Enter choice (1-3, 0, or q): ", end="", flush=True) 
+        print("Enter choice (1-4, 0, or q): ", end="", flush=True) 
 
     elif CURRENT_STATE == 1.5: # Level Selection
         print("Please choose a difficulty level:")
@@ -102,6 +113,13 @@ def print_menu():
         print("="*50)
         print("Enter choice (1-2 or q): ", end="", flush=True)
 
+    # NEW STATE
+    elif CURRENT_STATE == 1.8: # Challenge Input
+        print("--- AI Assessment ---")
+        print("Please describe your learning challenges in detail (e.g., 'I struggle with word order and sequencing in math'):")
+        print("="*50)
+        print("Enter challenges (or 'q' to cancel): ", end="", flush=True)
+
     elif CURRENT_STATE == 2: # Answer Input
         print(f"**Question:** {CURRENT_QUESTION_TEXT}")
         print("="*50)
@@ -109,7 +127,7 @@ def print_menu():
     
     elif CURRENT_STATE == 3: # Next Action
         print("What would you like to do next?")
-        print("  [1] Select New Subject/Level") # Changed for clarity 
+        print("  [1] Select New Subject/Level")
         print("  [0] Check My History")
         print("  [q] Quit Session") 
         print("="*50)
@@ -153,6 +171,12 @@ async def user_input_task(ctx: Context):
                     await ctx.send(TUTOR_AGENT_ADDRESS, create_history_query("check my history"))
                     CURRENT_STATE = 0 
                     print(f"\n[SYSTEM] Sending request for history...")
+                
+                # NEW: Check for AI Assessment option (index len(SUBJECT_OPTIONS) + 1)
+                elif text == str(len(SUBJECT_OPTIONS) + 1).lower():
+                    CURRENT_STATE = 1.8 # Move to the new state
+                    print_menu()
+
                 else:
                     try:
                         choice_index = int(text) - 1
@@ -176,7 +200,7 @@ async def user_input_task(ctx: Context):
                         
                         ctx.logger.info(f"User chose subject: {subject} and level: {level}")
                         
-                        # FIX: Send the query as a simple text message with the format "Subject:Level"
+                        # Send the query as a simple text message with the format "Subject:Level"
                         message = f"{subject}:{level}"
                         await ctx.send(TUTOR_AGENT_ADDRESS, create_text_chat(message))
                         
@@ -189,7 +213,21 @@ async def user_input_task(ctx: Context):
                 except ValueError:
                     print("[SYSTEM] Invalid input. Please enter a number or 'q'.")
                     print_menu()
-                        
+
+            # NEW: Handle Challenge Input
+            elif CURRENT_STATE == 1.8:
+                challenges = text # Capture the free-form text
+                if not challenges:
+                    print("[SYSTEM] Please provide some challenges.")
+                else:
+                    ctx.logger.info(f"User submitted challenges for AI assessment: {challenges[:20]}...")
+                    # Send the special command to the Tutor Agent
+                    await ctx.send(TUTOR_AGENT_ADDRESS, create_assessment_request(challenges))
+                    
+                    CURRENT_STATE = 0 # Wait for the AI's response
+                    print(f"\n[SYSTEM] Sending challenges for AI analysis...")
+
+
             elif CURRENT_STATE == 2: # Answer Input
                 ctx.logger.info(f"User submitted answer: {text}")
                 await ctx.send(TUTOR_AGENT_ADDRESS, create_text_chat(text))
@@ -198,7 +236,7 @@ async def user_input_task(ctx: Context):
 
             elif CURRENT_STATE == 3: # Next Action
                 if text == '1':
-                    # Instead of 'next question', go back to subject selection (State 1)
+                    # Go back to main menu
                     CURRENT_STATE = 1
                     print_menu()
                 elif text == '0':
@@ -264,9 +302,26 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
             text = item.text
             ctx.logger.info(f"Text message from {sender}: {text}")
 
-            if text.startswith("::HISTORY_RESPONSE::"):
-                # This block is for a hypothetical *Tutor-sent* history payload, 
-                # which isn't happening right now. We'll leave it as is, but rely on the logic below.
+            if text.startswith("::AI_RECOMMENDATION::"):
+                # NEW: Handle the AI recommendation from the Tutor Agent
+                parts = text.replace("::AI_RECOMMENDATION::", "", 1).split("::", 2)
+                
+                if len(parts) == 3:
+                    # parts[0] is Subject:Level, parts[1] is the text message
+                    # The full text message contains all the formatting and suggestion
+                    
+                    # Print the Tutor's structured response clearly 
+                    print("\n" + "~"*50)
+                    print(f"[TUTOR] {parts[2].strip()}") 
+                    print("~"*50)
+                    
+                    # The recommendation is complete; move to the next action state
+                    CURRENT_STATE = 3 
+                    print_menu()
+                    return # Exit after processing recommendation
+
+            elif text.startswith("::HISTORY_RESPONSE::"):
+                # Existing block for a hypothetical Tutor-sent history payload
                 json_data = text.replace("::HISTORY_RESPONSE::", "", 1)
                 try:
                     # ... (logic to handle Tutor-sent history)
@@ -279,7 +334,7 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
                 print_menu()
                 return 
 
-            if text.startswith("::HISTORY_UPDATE::"):
+            elif text.startswith("::HISTORY_UPDATE::"):
                 json_data = text.replace("::HISTORY_UPDATE::", "", 1)
                 try:
                     # The payload structure is '{"...json...": value}::Feedback text...'
@@ -289,7 +344,7 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
 
                     history_entry = json.loads(history_json)
                     
-                    # FIX 2: Save the history entry to the global list
+                    # Save the history entry to the global list
                     STUDENT_HISTORY.append(history_entry)
 
                     # Print only the feedback text
@@ -305,7 +360,6 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
                     ctx.logger.error("Failed to decode history data from Tutor Agent.")
                     # Fallthrough to display error as simple text
                 
-            # FIX 3: Check for the specific history acknowledgment from the Tutor Agent
             elif text.startswith("History request acknowledged."):
                 ctx.logger.info("Received history acknowledgment. Displaying local history.")
                 
@@ -329,9 +383,9 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
                 # Revert to the appropriate state and print the menu
                 CURRENT_STATE = 3 if CURRENT_QUESTION_TEXT else 1
                 print_menu()
-                return # IMPORTANT: return to prevent falling through to the general text handler
+                return 
                 
-            # Print the Tutor's response clearly 
+            # Print the Tutor's response clearly (general text handler)
             print("\n" + "~"*50)
             print(f"[TUTOR] {text}") 
             print("~"*50)
