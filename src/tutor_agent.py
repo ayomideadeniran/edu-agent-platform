@@ -6,14 +6,14 @@ from uuid import uuid4
 from uagents import Agent, Context, Protocol, Model
 from uagents.setup import fund_agent_if_low
 
-# 🚀 NEW: Updated to import new structured content models
+# 🚀 NEW: Updated to import all structured content models
 from models import (
     KnowledgeQuery, 
     KnowledgeResponse, 
     AssessmentRequest, 
     AssessmentResponse,
-    AssessmentRequestContent, # 🚀 NEW
-    RecommendationContent      # 🚀 NEW
+    AssessmentRequestContent,
+    RecommendationContent      
 )
 
 # Import necessary components for handling the Student Agent's generic ChatMessage
@@ -46,6 +46,9 @@ fund_agent_if_low(agent.wallet.address())
 # Define protocols
 tutor_protocol = Protocol(name="Tutor", version="0.1")
 chat_proto = Protocol(spec=chat_protocol_spec)
+
+# 🚫 FIX: REMOVED invalid chat_proto.add_model() calls.
+# The correct way is to ensure all models are imported and included in the final manifest publish.
 
 # --- GLOBAL VARIABLES & CONFIGURATION ---
 
@@ -129,7 +132,7 @@ async def handle_student_chat_message(ctx: Context, sender: str, msg: ChatMessag
 
     for item in msg.content:
         
-        # 🚀 NEW: Check for structured Assessment Request Content
+        # NEW: Check for structured Assessment Request Content
         if isinstance(item, AssessmentRequestContent):
             
             challenge_text = item.text
@@ -179,6 +182,30 @@ async def handle_student_chat_message(ctx: Context, sender: str, msg: ChatMessag
                 history_ack_msg = "History request acknowledged. Please check your Student Agent console for local history."
                 await ctx.send(sender, create_text_chat(history_ack_msg))
                 ctx.logger.info("Special History Command acknowledged.")
+                return
+
+            # --- Check for Assessment Request prefix (::ASSESSMENT_REQUEST::) ---
+            if text.startswith("::ASSESSMENT_REQUEST::"):
+                # Extract the free-form challenges text and forward as AssessmentRequest
+                challenge_text = text.replace("::ASSESSMENT_REQUEST::", "", 1).strip()
+                if not challenge_text:
+                    await ctx.send(sender, create_text_chat("Please provide some details for the AI assessment."))
+                    return
+
+                # Store state and original sender so we can relay the response later
+                PENDING_ASSESSMENT_SENDER = sender
+
+                # Forward the structured AssessmentRequest model to the AI Assessment Agent
+                try:
+                    assessment_msg = AssessmentRequest(user_challenges=challenge_text)
+                    await ctx.send(AI_ASSESSMENT_AGENT_ADDRESS, assessment_msg)
+                    ctx.logger.info("Forwarded assessment request to AI Assessment Agent.")
+                except Exception as e:
+                    ctx.logger.error(f"Failed to forward assessment request: {e}")
+                    await ctx.send(sender, create_text_chat("Sorry, I couldn't reach the AI Assessment Agent right now. Please try again later."))
+
+                # Inform the student that analysis is in progress
+                await ctx.send(sender, create_text_chat("[SYSTEM] Analyzing your challenges with the AI... This may take a moment."))
                 return
 
             # --- Handle Answer Submission (GRADING) (Existing) ---
@@ -268,21 +295,24 @@ async def handle_assessment_response(ctx: Context, sender: str, msg: AssessmentR
         final_summary = original_summary 
     # -----------------------------------------------
 
-    # 🚀 NEW: Create and send the structured RecommendationContent
-    recommendation_content = RecommendationContent(
-        subject=recommended_subject,
-        level=recommended_level,
-        analysis=final_summary
-    )
-    
-    recommendation_msg = ChatMessage(
-        timestamp=datetime.utcnow(),
-        msg_id=uuid4(),
-        content=[recommendation_content]
-    )
-
-    await ctx.send(student_address, recommendation_msg)
-    ctx.logger.info(f"Relayed structured AI recommendation to Student: {recommended_subject}:{recommended_level}")
+    # Send recommendation as a TextContent with a prefix so Student Agent (and other
+    # generic ChatProtocol clients) can parse it without requiring custom content models.
+    try:
+        payload = {
+            'subject': recommended_subject,
+            'level': recommended_level,
+            'analysis': final_summary
+        }
+        recommendation_text = f"::AI_RECOMMENDATION::{json.dumps(payload)}"
+        await ctx.send(student_address, create_text_chat(recommendation_text))
+        ctx.logger.info(f"Relayed AI recommendation to Student as text: {recommended_subject}:{recommended_level}")
+    except Exception as e:
+        ctx.logger.error(f"Failed to send AI recommendation to student: {e}")
+        # Fallback: send a plain human-readable message
+        fallback = (
+            f"AI Recommendation: {recommended_subject}:{recommended_level}. {final_summary}"
+        )
+        await ctx.send(student_address, create_text_chat(fallback))
 
 
 # --- KNOWLEDGE AGENT COMMUNICATION (INTERVAL & HANDLER) (Existing) ---
@@ -343,8 +373,9 @@ async def handle_knowledge_response(ctx: Context, sender: str, msg: KnowledgeRes
 
 
 # --- MAIN EXECUTION ---
+# Ensure both protocols are included. publish_manifest=True is crucial for ASI:One visibility
 agent.include(tutor_protocol)
-agent.include(chat_proto, publish_manifest=True) # 🚀 Ensure publish_manifest=True for ASI:One
+agent.include(chat_proto, publish_manifest=True) 
 
 if __name__ == "__main__":
     with open("tutor_address.txt", "w") as f:

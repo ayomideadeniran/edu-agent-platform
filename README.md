@@ -15,8 +15,11 @@ This project demonstrates a multi-agent educational platform built using the **F
 
 The agents are categorized under Innovation Lab and are part of the Hackathon:
 
-!tag:innovationlab
-!tag:hackathon
+![tag:innovationlab](https://img.shields.io/badge/innovationlab-3D8BD3)
+![tag:hackathon](https://img.shields.io/badge/hackathon-5F43F1)
+
+---
+
 
 ### Setup and Running Instructions
 

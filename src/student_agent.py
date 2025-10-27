@@ -21,12 +21,15 @@ from uagents_core.contrib.protocols.chat import (
     TextContent,
     chat_protocol_spec,
 )
-# 🚀 NEW: Updated to import new structured content models
+# 🚀 NEW: Updated to import all structured content models
 from models import KnowledgeQuery, KnowledgeResponse, AssessmentRequest, AssessmentRequestContent, RecommendationContent 
 
 
 # --- AGENT SETUP ---
 chat_proto = Protocol(spec=chat_protocol_spec)
+
+# 🚫 FIX: REMOVED invalid chat_proto.add_model() calls.
+
 
 # --- CONFIGURATION ---
 TUTOR_AGENT_ADDRESS = None 
@@ -81,8 +84,6 @@ def create_history_query(query: str) -> ChatMessage:
         msg_id=uuid4(),
         content=[TextContent(text=history_request_text)],
     )
-
-# NOTE: create_assessment_request helper is no longer needed as we use the structured model directly in the input loop.
 
 
 def print_menu():
@@ -209,7 +210,7 @@ async def user_input_task(ctx: Context):
                     print("[SYSTEM] Invalid input. Please enter a number or 'q'.")
                     print_menu()
 
-            # 🚀 NEW: Handle structured AssessmentRequestContent
+            # NEW: Handle structured AssessmentRequestContent
             elif CURRENT_STATE == 1.8:
                 challenges = text # Capture the free-form text
                 if not challenges.strip():
@@ -217,18 +218,11 @@ async def user_input_task(ctx: Context):
                 else:
                     ctx.logger.info(f"User submitted challenges for AI assessment: {challenges[:20]}...")
                     
-                    # 1. Create the structured content
-                    assessment_content = AssessmentRequestContent(text=challenges)
-                    
-                    # 2. Wrap the content in a ChatMessage
-                    assessment_msg = ChatMessage(
-                        timestamp=datetime.utcnow(),
-                        msg_id=uuid4(),
-                        content=[assessment_content] 
-                    )
-
-                    # 3. Send the message
-                    await ctx.send(TUTOR_AGENT_ADDRESS, assessment_msg)
+                    # Use a simple TextContent with a prefix so the Tutor can parse it
+                    # This avoids ChatMessage/content validation issues when using
+                    # custom content model classes that are not part of the ChatProtocol
+                    assessment_text = f"::ASSESSMENT_REQUEST::{challenges}"
+                    await ctx.send(TUTOR_AGENT_ADDRESS, create_text_chat(assessment_text))
                     
                     CURRENT_STATE = 0 # Wait for the AI's response
                     print(f"\n[SYSTEM] Sending challenges for AI analysis...")
@@ -304,27 +298,36 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
 
     for item in msg.content:
         
-        # 🚀 NEW: Handle the structured Recommendation Content (Highest Priority)
-        if isinstance(item, RecommendationContent):
-            
-            # Print the Tutor's structured response clearly 
-            print("\n" + "~"*50)
-            print(f"**✅ AI Recommendation Received!**")
-            print(f"**AI Analysis:** {item.analysis}")
-            print(f"**Suggested Lesson:** {item.subject}: {item.level}")
-            print(f"\n[TUTOR] To start this lesson, type the exact suggestion (e.g., '{item.subject}:{item.level}') or select a different option from the menu.")
-            print("~"*50)
-            
-            CURRENT_STATE = 3 
-            print_menu()
-            return # Exit after processing recommendation
+        # RecommendationContent is no longer used directly in ChatMessages.
+        # AI recommendations are sent as prefixed TextContent ::AI_RECOMMENDATION::{{json}}
+        # so they remain compatible with the Chat Protocol.
         
         # Existing TextContent handling (Lower Priority)
         if isinstance(item, TextContent):
             text = item.text
             ctx.logger.info(f"Text message from {sender}: {text}")
+            # Handle AI recommendation payloads sent as prefixed JSON
+            if text.startswith("::AI_RECOMMENDATION::"):
+                try:
+                    payload_json = text.replace("::AI_RECOMMENDATION::", "", 1)
+                    payload = json.loads(payload_json)
+                    subj = payload.get('subject')
+                    lvl = payload.get('level')
+                    analysis = payload.get('analysis')
 
-            # NOTE: The ::AI_RECOMMENDATION:: block has been removed as it's replaced by RecommendationContent.
+                    print("\n" + "~"*50)
+                    print("**✅ AI Recommendation Received!**")
+                    print(f"**AI Analysis:** {analysis}")
+                    print(f"**Suggested Lesson:** {subj}: {lvl}")
+                    print(f"\n[TUTOR] To start this lesson, type the exact suggestion (e.g., '{subj}:{lvl}') or select a different option from the menu.")
+                    print("~"*50)
+
+                    CURRENT_STATE = 3
+                    print_menu()
+                    return
+                except Exception as e:
+                    ctx.logger.error(f"Failed to parse AI recommendation payload: {e}")
+                    # fall through to normal handling
             
             # --- Handle HISTORY PAYLOADS (Still using text for complexity) ---
             if text.startswith("::HISTORY_RESPONSE::"):
@@ -368,7 +371,7 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
                 print("           TUTORING SESSION HISTORY")
                 print("="*50)
 
-                # 🌟 FIX START: Logic to display history
+                # FIX: Logic to display history
                 if STUDENT_HISTORY:
                     for i, entry in enumerate(STUDENT_HISTORY, 1):
                         status = "✅ Correct" if entry.get('is_correct') else "❌ Incorrect"
@@ -381,7 +384,7 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
                     print("\nNo tutoring history recorded yet in this session.")
                 
                 print("="*50 + "\n")
-                # 🌟 FIX END
+                
 
                 CURRENT_STATE = 3 if CURRENT_QUESTION_TEXT else 1
                 print_menu()
@@ -416,9 +419,8 @@ async def handle_acknowledgement(ctx: Context, sender: str, msg: ChatAcknowledge
     return None
 
 
-
 # --- MAIN EXECUTION ---
-agent.include(chat_proto, publish_manifest=True) # 🚀 Ensure publish_manifest=True for ASI:One
+agent.include(chat_proto, publish_manifest=True) 
 
 if __name__ == "__main__":
     with open("student_address.txt", "w") as f:
