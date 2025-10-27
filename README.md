@@ -50,6 +50,8 @@ For the judges' reference, the expected addresses for the agents are:
   * **Tutor Agent:** `agent1qfz0z6wc0ep8ser24qssdf3dtkln4lyzvvutr0zwj0kv0h74w6r8yhe7kyt`
   * **Knowledge Agent:** `agent1q0n0gf3nm2mevkj6mm45cmjvm3sx23glx38sdmn4kjmw8xm4stn2q600dnq`
   * **Student Agent:** `agent1qddgfypwrksthknutu7pxxk4mkp86uma7g0lrxp8ae3wdx472qjxyxhzgp5`
+  * **Knowledge Agent:**
+  `agent1qtmnjcac90xddj67av0j3jumtrj8y6y69xtxslpt9e0uuszufnz3xxu0pky`
 
 **4. Run Agents (In Order)**
 
@@ -129,5 +131,35 @@ When you are finished working on this project in your current terminal window, y
 ```bash
 deactivate
 ```
+
+## Environment variables and .env file
+
+For local development you can store sensitive keys in a `.env` file at the project root (same directory that contains `src/`). The agents will load these values at startup when `python-dotenv` is installed.
+
+Example `.env` content:
+
+```bash
+# Gemini API Key for the AI Assessment Agent
+GEMINI_API_KEY="your_gemini_api_key_here"
+
+# (Optional) Legacy name accepted by the code
+GOOGLE_API_KEY="your_gemini_api_key_here"
+
+Installation and usage tips:
+
+- Install the loader library:
+
+```bash
+pip install python-dotenv
+```
+
+- Add `.env` to your `.gitignore` to avoid committing secrets:
+
+```
+.env
+```
+
+- The AI Assessment Agent prefers `GEMINI_API_KEY` but will fall back to `GOOGLE_API_KEY` if present. If no key is available, the agent uses a local mock fallback.
+
 
 Your terminal prompt will return to its normal state, and any subsequent `pip install` commands will affect your global Python environment (which is usually what you want to avoid).
