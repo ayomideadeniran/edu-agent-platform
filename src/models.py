@@ -1,4 +1,5 @@
 from uagents import Model
+# --- LINE 3 HAS BEEN REMOVED: from uagents.protocols.experimental.chat import Content # This line caused the error
 
 # --- Knowledge Models ---
 
@@ -6,7 +7,6 @@ from uagents import Model
 class KnowledgeQuery(Model):
     subject: str
     level: str
-    # Optional address of the original requester (Student Agent).
     reply_to: str = ""
 
 # Model used by the Knowledge Agent to send the result back to the Tutor Agent
@@ -17,26 +17,36 @@ class KnowledgeResponse(Model):
     question: str
     answer: str
     explanation: str
-    # Optional address indicating which student the tutor should relay this response to.
     reply_to: str = ""
 
 
 # --- NEW AI ASSESSMENT MODELS ---
 
 class AssessmentRequest(Model):
-    """
-    Message sent from the Tutor Agent to the AI Assessment Agent
-    containing the user's free-form challenges.
-    """
     user_challenges: str
 
 class AssessmentResponse(Model):
-    """
-    Structured recommendation returned from the AI Assessment Agent
-    to the Tutor Agent.
-    """
     recommendation_subject: str
     recommendation_level: str
     analysis_summary: str
-    # Note: We rely on the Tutor Agent's PENDING_ASSESSMENT_SENDER state 
-    # instead of a reply_to field here, as implemented in tutor_agent.py.
+
+
+# --- NEW CHAT PROTOCOL CONTENT MODELS (Now inheriting directly from Model) ---
+
+class AssessmentRequestContent(Model): # 🚀 FIX: Inherits from Model
+    """
+    A structured content model for the AI Assessment request.
+    This replaces the custom '::ASSESSMENT_REQUEST::' string parsing.
+    """
+    text: str 
+    type: str = "assessment_request" # CRITICAL: This field identifies the message type
+
+class RecommendationContent(Model): # 🚀 FIX: Inherits from Model
+    """
+    A structured content model for relaying the final AI recommendation.
+    This replaces the custom '::AI_RECOMMENDATION::' string parsing.
+    """
+    subject: str
+    level: str
+    analysis: str
+    type: str = "ai_recommendation" # CRITICAL: This field identifies the message type

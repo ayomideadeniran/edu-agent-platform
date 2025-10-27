@@ -8,5 +8,10 @@
         "current_question": null
     },
     "last_student_query_addr": "agent1qddgfypwrksthknutu7pxxk4mkp86uma7g0lrxp8ae3wdx472qjxyxhzgp5",
-    "active_question_data_agent1qddgfypwrksthknutu7pxxk4mkp86uma7g0lrxp8ae3wdx472qjxyxhzgp5": null
+    "active_question_data_agent1qddgfypwrksthknutu7pxxk4mkp86uma7g0lrxp8ae3wdx472qjxyxhzgp5": {
+        "question": "What is the primary characteristic of Impressionism?",
+        "correct_answer": "Visible Brushstrokes",
+        "topic": "Movements",
+        "explanation": "Impressionism is characterized by relatively thin, visible brushstrokes and an emphasis on the depiction of light."
+    }
 }
