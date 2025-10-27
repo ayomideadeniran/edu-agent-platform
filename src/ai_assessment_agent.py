@@ -2,6 +2,14 @@
 import sys
 import os
 import json
+from dotenv import load_dotenv
+
+# --- Load Environment Variables FIRST (From .env file) ---
+# This ensures os.environ.get() can find the keys immediately.
+# load_dotenv() is already present in your original code, but kept here for completeness.
+load_dotenv() 
+# --------------------------------------------------------
+
 from uagents import Agent, Context, Protocol
 from uagents.setup import fund_agent_if_low
 from models import AssessmentRequest, AssessmentResponse 
@@ -23,11 +31,14 @@ except ImportError:
 
 # Initialize the Gemini Client.
 try:
-    GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY')
-    if not GOOGLE_API_KEY:
-         raise ValueError("GOOGLE_API_KEY environment variable is not set.")
+    # --- CORRECTED VARIABLE NAME HERE ---
+    GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY') 
+    
+    if not GEMINI_API_KEY:
+         # Changed error message to reflect the correct variable
+         raise ValueError("GEMINI_API_KEY environment variable is not set.")
 
-    GEMINI_CLIENT = genai.Client(api_key=GOOGLE_API_KEY)
+    GEMINI_CLIENT = genai.Client(api_key=GEMINI_API_KEY)
     GEMINI_MODEL = 'gemini-2.5-flash' 
 except Exception as e:
     # Log the failure but allow the agent to run, relying on the mock fallback.
@@ -74,7 +85,7 @@ def determine_mock_recommendation(challenges: str, error_message: str) -> Dict[s
         )
 
     # --- Logic 3: Coding/Logic/Abstract Thinking ---
-    elif any(word in challenges_lower for word in ['coding', 'algorithm', 'programming', 'loop', 'data structure', 'binary']):
+    elif any(word in challenges_lower for word in ['coding', 'algorithm', 'programming', 'loop', 'data structure', 'binary', 'big o']):
         recommended_subject = "Computer Science"
         recommended_level = "Intermediate"
         summary = (
@@ -140,7 +151,8 @@ AGENT_NAME = "ai_assessment_agent"
 agent = Agent(
     name=AGENT_NAME,
     port=8003,
-    seed=f"{AGENT_NAME}_seed_phrase",
+    # Assuming FETCH_WALLET_SEED_PHRASE is also loaded from .env
+    seed=os.environ.get("FETCH_WALLET_SEED_PHRASE") or f"{AGENT_NAME}_seed_phrase", 
     endpoint=[f"http://127.0.0.1:8003/submit"], 
 )
 fund_agent_if_low(agent.wallet.address())
@@ -177,7 +189,7 @@ async def handle_assessment_request(ctx: Context, sender: str, msg: AssessmentRe
 
     try:
         if not GEMINI_CLIENT:
-             # Force an error if the client failed to initialize at startup (due to missing key)
+             # This will still trigger if the key was missing at startup
              raise ValueError("Gemini Client not initialized due to bad/missing API key.")
 
         # 3. Call the Gemini API
