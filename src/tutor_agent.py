@@ -77,6 +77,38 @@ AVAILABLE_SUBJECTS = ["Math", "History", "Science"]
 AVAILABLE_LEVELS = ["Beginner", "Intermediate"]
 
 
+def load_local_curriculum():
+    """Load curriculum from `curriculum.json` if present and normalize into lists."""
+    global AVAILABLE_SUBJECTS, AVAILABLE_LEVELS
+    try:
+        with open('curriculum.json', 'r') as cf:
+            data = json.load(cf)
+        subjects_field = data.get('subjects')
+        if isinstance(subjects_field, dict):
+            AVAILABLE_SUBJECTS = list(subjects_field.keys())
+            # collect levels from dict values if provided, else from top-level 'levels'
+            levels_set = set()
+            for v in subjects_field.values():
+                if isinstance(v, list):
+                    levels_set.update(v)
+            AVAILABLE_LEVELS = sorted(list(levels_set)) if levels_set else data.get('levels', AVAILABLE_LEVELS)
+        elif isinstance(subjects_field, list):
+            AVAILABLE_SUBJECTS = subjects_field
+            AVAILABLE_LEVELS = data.get('levels', AVAILABLE_LEVELS)
+        else:
+            # no usable subjects field — keep defaults
+            pass
+        print(f"Loaded curriculum: subjects={AVAILABLE_SUBJECTS}, levels={AVAILABLE_LEVELS}")
+    except FileNotFoundError:
+        print("curriculum.json not found; using default curriculum lists")
+    except Exception as e:
+        print(f"Failed to load curriculum.json: {e}; using defaults")
+
+
+# Load curriculum at startup (file may have been edited)
+load_local_curriculum()
+
+
 # --- HELPER FUNCTIONS ---
 
 def create_text_chat(text: str) -> ChatMessage:
@@ -290,7 +322,14 @@ async def check_pending_query(ctx: Context):
             ctx.logger.info(f"Forwarding query for {subject} ({level}) to Knowledge Agent at {KNOWLEDGE_AGENT_ADDRESS}")
 
             # Use the dedicated KnowledgeQuery model
-            await ctx.send(KNOWLEDGE_AGENT_ADDRESS, KnowledgeQuery(subject=subject, level=level))
+            try:
+                await ctx.send(KNOWLEDGE_AGENT_ADDRESS, KnowledgeQuery(subject=subject, level=level))
+            except Exception as e:
+                # Could be an Almanac/resolver error or network problem; inform student and log
+                ctx.logger.error(f"Failed to send KnowledgeQuery to {KNOWLEDGE_AGENT_ADDRESS}: {e}")
+                await ctx.send(student_address, create_text_chat("Sorry, I couldn't reach the Knowledge Agent right now. Please try again later."))
+                PENDING_QUERY = {}
+                return
 
             # Store the student's address in storage for the asynchronous reply handler
             ctx.storage.set("last_student_query_addr", student_address)
@@ -331,11 +370,15 @@ async def handle_knowledge_response(ctx: Context, sender: str, msg: KnowledgeRes
         # 2. Relay the question to the Student Agent
         question_text = f"Subject: {msg.subject} ({msg.topic})\nQuestion: {msg.question}"
 
-        await ctx.send(
-            student_address,
-            create_text_chat(question_text)
-        )
-        ctx.logger.info(f"Successfully relayed knowledge response for {msg.subject}.")
+        try:
+            await ctx.send(
+                student_address,
+                create_text_chat(question_text)
+            )
+            ctx.logger.info(f"Successfully relayed knowledge response for {msg.subject} to {student_address}.")
+        except Exception as e:
+            ctx.logger.error(f"Failed to relay knowledge response to {student_address}: {e}")
+            # Optionally inform the tutor console or persist for retry; for now log and continue.
     else:
         # Handle cases where the Knowledge Agent response is incomplete or an error
         error_text = f"Received incomplete data from Knowledge Agent for {msg.subject}:{msg.level}."

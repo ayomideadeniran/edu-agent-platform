@@ -51,12 +51,14 @@ fund_agent_if_low(agent.wallet.address())
 # 0: Waiting for agent response
 # 1: Waiting for subject selection (Main Menu)
 # 1.5: Waiting for level selection
-# 1.8: Waiting for challenge input (NEW: AI Assessment)
+# 1.8: Waiting for challenge input (AI Assessment)
 # 2: Waiting for question answer
 # 3: Waiting for next action (after answer/feedback/history)
 CURRENT_STATE = 0 
-SUBJECT_OPTIONS = ["Math", "History", "Science"]
-LEVEL_OPTIONS = ["Beginner", "Intermediate"] 
+# UPDATED: Added all 9 subjects
+SUBJECT_OPTIONS = ["Math", "History", "Science", "English", "Geography", "Literature", "Physics", "Computer Science", "Art History"]
+# UPDATED: Added Advanced level
+LEVEL_OPTIONS = ["Beginner", "Intermediate", "Advanced"] 
 CURRENT_QUESTION_TEXT = ""
 INPUT_TASK_STARTED = False 
 TEMP_SUBJECT = None 
@@ -81,7 +83,7 @@ def create_history_query(query: str) -> ChatMessage:
         content=[TextContent(text=history_request_text)],
     )
 
-# NEW: Helper function to create the assessment request command
+# Helper function to create the assessment request command
 def create_assessment_request(challenges: str) -> ChatMessage:
     assessment_request_text = f"::ASSESSMENT_REQUEST::{challenges}"
     return ChatMessage(
@@ -91,27 +93,32 @@ def create_assessment_request(challenges: str) -> ChatMessage:
     )
 
 def print_menu():
-    global CURRENT_STATE
+    global CURRENT_STATE, SUBJECT_OPTIONS, LEVEL_OPTIONS
     print("\n" + "="*50)
     
     if CURRENT_STATE == 1: # Subject Selection/Main Menu
-        print("Please choose an option by pressing the corresponding number:")
+        print("Please choose a subject or option:")
+        # Loop through all 9 updated subjects
         for i, subject in enumerate(SUBJECT_OPTIONS):
             print(f"  [{i+1}] {subject}")
-        # NEW OPTION
-        print(f"  [{len(SUBJECT_OPTIONS) + 1}] Dyslexia Assessment (AI)") 
+            
+        # Updated AI Assessment and menu options
+        print("  [A] AI Assessment (Diagnostic)") 
         print("  [0] Check My History")
         print("  [q] Quit Session") 
         print("="*50)
-        print("Enter choice (1-4, 0, or q): ", end="", flush=True) 
+        # Updated prompt to reflect all options
+        print("Enter choice (1-9, A, 0, or q): ", end="", flush=True) 
 
     elif CURRENT_STATE == 1.5: # Level Selection
         print("Please choose a difficulty level:")
+        # Loop through all 3 updated levels
         for i, level in enumerate(LEVEL_OPTIONS):
             print(f"  [{i+1}] {level}")
         print("  [q] Quit Session")
         print("="*50)
-        print("Enter choice (1-2 or q): ", end="", flush=True)
+        # Updated prompt to reflect all options (1-3)
+        print("Enter choice (1-3 or q): ", end="", flush=True)
 
     # NEW STATE
     elif CURRENT_STATE == 1.8: # Challenge Input
@@ -156,10 +163,10 @@ async def user_input_task(ctx: Context):
                 print_menu()
                 continue
 
-            text = text.strip().lower()
+            text = text.strip().upper() # Use upper for easier comparison of 'A' and 'Q'
 
             # --- QUIT HANDLING ---
-            if text == 'q':
+            if text == 'Q':
                 print("\n[SYSTEM] Session terminated. Shutting down student agent...")
                 sys.exit(0) 
                 return
@@ -172,29 +179,31 @@ async def user_input_task(ctx: Context):
                     CURRENT_STATE = 0 
                     print(f"\n[SYSTEM] Sending request for history...")
                 
-                # NEW: Check for AI Assessment option (index len(SUBJECT_OPTIONS) + 1)
-                elif text == str(len(SUBJECT_OPTIONS) + 1).lower():
+                # Check for AI Assessment option ('A')
+                elif text == 'A':
                     CURRENT_STATE = 1.8 # Move to the new state
                     print_menu()
 
                 else:
                     try:
                         choice_index = int(text) - 1
-                        if 0 <= choice_index < len(SUBJECT_OPTIONS):
+                        # Check against the full 9 subject list
+                        if 0 <= choice_index < len(SUBJECT_OPTIONS): 
                             TEMP_SUBJECT = SUBJECT_OPTIONS[choice_index]
                             CURRENT_STATE = 1.5
                             print_menu()
                         else:
-                            print("[SYSTEM] Invalid choice. Please enter a number from the menu.")
+                            print("[SYSTEM] Invalid choice. Please enter a number from the menu (1-9), 'A', '0', or 'q'.")
                             print_menu()
                     except ValueError:
-                        print("[SYSTEM] Invalid input. Please enter a number or 'q'.")
+                        print("[SYSTEM] Invalid input. Please enter a number, 'A', '0', or 'q'.")
                         print_menu()
 
             elif CURRENT_STATE == 1.5: # Level Selection
                 try:
                     choice_index = int(text) - 1
-                    if 0 <= choice_index < len(LEVEL_OPTIONS):
+                    # Check against the full 3 level list
+                    if 0 <= choice_index < len(LEVEL_OPTIONS): 
                         level = LEVEL_OPTIONS[choice_index]
                         subject = TEMP_SUBJECT
                         
@@ -208,7 +217,7 @@ async def user_input_task(ctx: Context):
                         TEMP_SUBJECT = None
                         print(f"\n[SYSTEM] Sending request for {subject} at {level} level...")
                     else:
-                        print("[SYSTEM] Invalid choice. Please enter a number from the menu.")
+                        print("[SYSTEM] Invalid choice. Please enter a number from the menu (1-3).")
                         print_menu()
                 except ValueError:
                     print("[SYSTEM] Invalid input. Please enter a number or 'q'.")
@@ -217,7 +226,7 @@ async def user_input_task(ctx: Context):
             # NEW: Handle Challenge Input
             elif CURRENT_STATE == 1.8:
                 challenges = text # Capture the free-form text
-                if not challenges:
+                if not challenges.strip():
                     print("[SYSTEM] Please provide some challenges.")
                 else:
                     ctx.logger.info(f"User submitted challenges for AI assessment: {challenges[:20]}...")
@@ -303,13 +312,10 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
             ctx.logger.info(f"Text message from {sender}: {text}")
 
             if text.startswith("::AI_RECOMMENDATION::"):
-                # NEW: Handle the AI recommendation from the Tutor Agent
+                # Handle the AI recommendation from the Tutor Agent
                 parts = text.replace("::AI_RECOMMENDATION::", "", 1).split("::", 2)
                 
                 if len(parts) == 3:
-                    # parts[0] is Subject:Level, parts[1] is the text message
-                    # The full text message contains all the formatting and suggestion
-                    
                     # Print the Tutor's structured response clearly 
                     print("\n" + "~"*50)
                     print(f"[TUTOR] {parts[2].strip()}") 

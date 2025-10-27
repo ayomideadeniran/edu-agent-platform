@@ -1,4 +1,4 @@
-# ai_assessment_agent.py (Live Gemini API Integration with Fallback)
+# ai_assessment_agent.py (Live Gemini API Integration with Full Fallback)
 import sys
 import os
 import json
@@ -21,9 +21,7 @@ except ImportError:
     print("FATAL: 'google-genai' library not found. Please install with 'pip install google-genai'.")
     sys.exit(1)
 
-# Initialize the Gemini Client. It relies on the GOOGLE_API_KEY environment variable.
-# NOTE: The client initialization will still fail without a valid key,
-# but we need this structure to define the try/except flow.
+# Initialize the Gemini Client.
 try:
     GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY')
     if not GOOGLE_API_KEY:
@@ -32,9 +30,7 @@ try:
     GEMINI_CLIENT = genai.Client(api_key=GOOGLE_API_KEY)
     GEMINI_MODEL = 'gemini-2.5-flash' 
 except Exception as e:
-    # This exception block prevents the agent from starting if the key is bad/missing.
-    # We will log the error but allow the script to continue to the main logic 
-    # where the real API call failure will be handled gracefully.
+    # Log the failure but allow the agent to run, relying on the mock fallback.
     print(f"INFO: Failed to initialize Gemini Client at startup: {e}. Assuming local mock will be needed.")
     GEMINI_CLIENT = None
     GEMINI_MODEL = None
@@ -48,55 +44,93 @@ def determine_mock_recommendation(challenges: str, error_message: str) -> Dict[s
     """
     
     # Define the possible subject and level names for structured output
-    SUBJECTS = ["Math", "History", "Science"]
-    LEVELS = ["Beginner", "Intermediate"]
+    SUBJECTS = ["Math", "History", "Science", "English", "Geography", "Literature", "Physics", "Computer Science", "Art History"]
+    LEVELS = ["Beginner", "Intermediate", "Advanced"]
     
     # Default recommendation
     recommended_subject = "History"
     recommended_level = "Beginner"
+    summary = ""
     
     challenges_lower = challenges.lower()
     
-    # --- Logic 1: Dyslexia/Reading Challenges (Highest Priority) ---
+    # --- Logic 1: Dyslexia/Reading/Foundational Literacy (Highest Priority) ---
     reading_keywords = ['letters', 'sound blends', 'phonetically', 'spelling', 'reading aloud', 'sight words', 'dyslexia', 'decode']
     if any(word in challenges_lower for word in reading_keywords):
-        recommended_subject = "History" # Choose a low-reading-complexity subject
+        recommended_subject = "English" 
         recommended_level = "Beginner"
         summary = (
-            "**Mock Analysis:** User challenges indicate core difficulties with **phonetic decoding** and **automatic word recognition** "
-            "('sight words', 'stumble over simple words'), which strongly aligns with **dyslexic tendencies**. "
-            "Recommending **Beginner History** to build literacy confidence using simplified, structured content, bypassing high-stakes reading."
+            "User challenges indicate core difficulties with **phonetic decoding** and **automatic word recognition**. "
+            "Recommending **Beginner English** to reinforce foundational literacy skills in a low-complexity environment."
         )
     
     # --- Logic 2: Math/Numeracy Challenges ---
-    elif any(word in challenges_lower for word in ['numbers', 'calculate', 'equations', 'algebra', 'addition', 'subtraction', 'math']):
+    elif any(word in challenges_lower for word in ['numbers', 'calculate', 'equations', 'algebra', 'addition', 'subtraction', 'math', 'calculus']):
         recommended_subject = "Math"
-        recommended_level = "Beginner"
+        recommended_level = "Intermediate" if any(word in challenges_lower for word in ['calculus', 'algebra']) else "Beginner"
         summary = (
-            "**Mock Analysis:** Challenges are centered on **numerical concepts** and **calculation**. "
-            "Recommending a **Beginner Math** course to reinforce foundational arithmetic and number sense."
+            "Challenges are centered on **numerical concepts** and **calculation**. "
+            f"Recommending {recommended_level} Math to reinforce foundational arithmetic and number sense."
         )
 
-    # --- Logic 3: Science/Abstract/Factual Recall Challenges ---
-    elif any(word in challenges_lower for word in ['facts', 'science', 'concepts', 'theory', 'lab']):
-        recommended_subject = "Science"
+    # --- Logic 3: Coding/Logic/Abstract Thinking ---
+    elif any(word in challenges_lower for word in ['coding', 'algorithm', 'programming', 'loop', 'data structure', 'binary']):
+        recommended_subject = "Computer Science"
         recommended_level = "Intermediate"
         summary = (
-            "**Mock Analysis:** User is struggling with retaining and applying **scientific facts/concepts**. "
-            "Recommending **Intermediate Science** with a focus on visual and interactive learning methods to aid memory."
+            "Challenges point to difficulties in **algorithmic logic** and **abstract problem-solving** typical of coding. "
+            "Recommending Intermediate Computer Science to build structured thinking skills."
         )
 
-    # --- Logic 4: General/Vague Challenges (Default Fallback) ---
-    else:
+    # --- Logic 4: Applied Science/Formulas (Physics/Chemistry) ---
+    elif any(word in challenges_lower for word in ['force', 'velocity', 'gravity', 'formula', 'chemistry', 'atom', 'lab', 'experiment']):
+        recommended_subject = "Physics"
+        recommended_level = "Advanced" if any(word in challenges_lower for word in ['quantum', 'relativity']) else "Intermediate"
         summary = (
-            "**Mock Analysis:** Challenges are general. Recommending **Beginner History** as a balanced starting point "
-            "to work on general study habits and recall."
+            "Challenges are related to **applied science formulas** and physical principles. "
+            f"Recommending {recommended_level} Physics to strengthen problem-solving application."
+        )
+        
+    # --- Logic 5: General History/Recall ---
+    elif any(word in challenges_lower for word in ['dates', 'historical', 'timeline', 'world war', 'revolution']):
+        recommended_subject = "History"
+        recommended_level = "Beginner"
+        summary = (
+            "Challenges involve retaining **historical facts** and understanding **chronology**. "
+            "Recommending Beginner History for focused memory training and context-building."
+        )
+
+    # --- Logic 6: Interpretation/Thematic Analysis (Literature/Art History) ---
+    elif any(word in challenges_lower for word in ['symbolism', 'theme', 'meaning', 'poem', 'narrative', 'painting', 'art', 'artist']):
+        recommended_subject = "Literature"
+        recommended_level = "Intermediate"
+        summary = (
+            "Difficulties are in **interpretation** and **thematic analysis**. "
+            "Recommending Intermediate Literature to practice deep reading and contextual awareness."
+        )
+
+    # --- Logic 7: Earth/World Facts (Geography) ---
+    elif any(word in challenges_lower for word in ['country', 'map', 'river', 'continent', 'tectonic', 'climate']):
+        recommended_subject = "Geography"
+        recommended_level = "Beginner"
+        summary = (
+            "Challenges relate to **geographical facts** and **spatial reasoning**. "
+            "Recommending Beginner Geography to build global knowledge and context."
+        )
+
+    # --- Logic 8: Catch-all Default ---
+    else:
+        recommended_subject = "Science"
+        recommended_level = "Beginner"
+        summary = (
+            "Challenges were vague or did not match strong keywords. "
+            "Defaulting to **Beginner Science** as a balanced starting point for general study habits."
         )
         
     return {
         "subject": recommended_subject,
         "level": recommended_level,
-        "analysis_summary": f"LOCAL FALLBACK TRIGGERED (API Error: {error_message}). {summary}"
+        "analysis_summary": f"LOCAL FALLBACK TRIGGERED (API Error: {error_message}). **Mock Analysis:** {summary}"
     }
 # ------------------------------------
 
@@ -121,20 +155,19 @@ async def handle_assessment_request(ctx: Context, sender: str, msg: AssessmentRe
     ctx.logger.info(f"Received assessment request from {sender}. Challenges: {msg.user_challenges[:50]}...")
     
     user_challenges = msg.user_challenges
-    recommendation_data = None # Initialize a variable to hold the final result data
+    recommendation_data = None 
 
-    # 1. Define the System Instruction (AI's Persona and Goal) - Only needed for the API call
+    # 1. Define the System Instruction (AI's Persona and Goal)
     SYSTEM_INSTRUCTION = (
         "You are an expert educational AI designed to diagnose learning difficulties based "
         "on a user's self-reported challenges. Your goal is to recommend the best **subject and "
-        "level** to address their foundational deficits (e.g., if they have dyslexia, recommend "
-        "'History:Beginner' or 'Science:Beginner' to build literacy with low-complexity content). "
-        "Subjects are **Math, History, Science**. Levels are **Beginner, Intermediate**. " 
+        "level** to address their foundational deficits. "
+        "Subjects are **Math, History, Science, English, Geography, Literature, Physics, Computer Science, Art History**. Levels are **Beginner, Intermediate, Advanced**. " 
         "You **MUST** return a JSON object with the fields: 'subject', 'level', and 'analysis_summary'. "
         "Do not include any other text or markdown outside of the JSON block."
     )
 
-    # 2. Define the User Prompt - Only needed for the API call
+    # 2. Define the User Prompt
     prompt = (
         f"Analyze the user's reported learning challenges below and provide a recommendation. "
         f"User Challenges: \"{user_challenges}\" "
@@ -144,7 +177,7 @@ async def handle_assessment_request(ctx: Context, sender: str, msg: AssessmentRe
 
     try:
         if not GEMINI_CLIENT:
-             # Force an error if the client failed to initialize at startup
+             # Force an error if the client failed to initialize at startup (due to missing key)
              raise ValueError("Gemini Client not initialized due to bad/missing API key.")
 
         # 3. Call the Gemini API
@@ -154,9 +187,16 @@ async def handle_assessment_request(ctx: Context, sender: str, msg: AssessmentRe
             config=types.GenerateContentConfig(
                 system_instruction=SYSTEM_INSTRUCTION, 
                 response_mime_type="application/json", 
+                # CRITICAL: Updated response_schema for all 9 subjects and 3 levels
                 response_schema={"type": "object", "properties": {
-                    "subject": {"type": "string", "enum": ["Math", "History", "Science"]}, 
-                    "level": {"type": "string", "enum": ["Beginner", "Intermediate"]}, 
+                    "subject": {
+                        "type": "string",
+                        "enum": ["Math", "History", "Science", "English", "Geography", "Literature", "Physics", "Computer Science", "Art History"]
+                    },
+                    "level": {
+                        "type": "string",
+                        "enum": ["Beginner", "Intermediate", "Advanced"]
+                    },
                     "analysis_summary": {"type": "string"}
                 }}
             )
@@ -164,7 +204,6 @@ async def handle_assessment_request(ctx: Context, sender: str, msg: AssessmentRe
         
         # 4. Parse the JSON output
         recommendation_data = json.loads(response.text)
-        
         ctx.logger.info("Successfully received and parsed response from Gemini API.")
 
 
@@ -198,7 +237,4 @@ if __name__ == "__main__":
     # Save the address for the tutor agent to read
     with open("ai_assessment_address.txt", "w") as f:
         f.write(agent.address)
-    
-    # We allow the agent to run even if GEMINI_CLIENT is None,
-    # relying on the try/except block in the protocol handler.
     agent.run()

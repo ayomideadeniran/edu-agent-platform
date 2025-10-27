@@ -1,4 +1,4 @@
 {
-    "subjects": ["Math", "History", "Science"],
-    "levels": ["Beginner", "Intermediate"]
+    "subjects": ["Math", "History", "Science", "English", "Geography", "Literature", "Physics", "Computer Science", "Art History"],
+    "levels": ["Beginner", "Intermediate", "Advanced"]
 }

@@ -1,22 +1,22 @@
 # 🎓 Educational AI Agent System
 
-## ASI Agents Track Submission
-
-This project demonstrates a fully functional, three-agent educational tutoring system built using the **Fetch.ai `uAgents` framework**. It leverages the SingularityNET **`MeTTa` knowledge graph** for structured, subject-specific knowledge retrieval, and utilizes the **Chat Protocol** to ensure compatibility with the ASI:One interface.
+This project demonstrates a multi-agent educational platform built using the **Fetch.ai `uAgents` framework**. It features a modular architecture with a Student, Tutor, and Knowledge agent. A key feature is the AI Assessment agent, which leverages **Google's Gemini AI** to provide personalized learning recommendations. The system also uses the SingularityNET **`MeTTa` knowledge graph** for structured curriculum retrieval and the **Chat Protocol** for user interaction, ensuring compatibility with the ASI:One interface.
 
 ### Project Overview
 
-The system operates using a clear separation of concerns across three autonomous agents:
-
 | Agent Name | Role | Technology Used |
 | :--- | :--- | :--- |
-| **Student Agent** | **User Interface (CLI):** Handles session initiation, user input (subject/level choices, answers), and displays the Tutor's questions and feedback. | `uAgents`, `Chat Protocol` |
-| **Tutor Agent** | **Central Coordinator:** Manages the user's session state (history), routes queries to the Knowledge Agent, and grades the user's answers. | `uAgents`, `Chat Protocol`, State Management |
+| **Student Agent** | **User Interface (CLI):** Handles session initiation, user input (subject/level choices, answers, AI diagnostics), and displays the Tutor's questions and feedback. | `uagents`, `Chat Protocol` |
+| **Tutor Agent** | **Central Coordinator:** Manages the user's session state (history), routes queries to the Knowledge Agent, grades answers, and forwards diagnostic requests to the AI Assessment Agent. | `uAgents`, `Chat Protocol`, State Management |
 | **Knowledge Agent** | **Knowledge Base:** Serves questions and answers based on specific Subject/Level queries by querying the structured `curriculum.metta` file using `MeTTa`. | `uAgents`, `MeTTa` (`hyperon`), Knowledge Graph |
+| **AI Assessment Agent** | **(Optional) AI Diagnostician:** Receives user challenges from the Tutor, analyzes them, and provides a personalized subject/level recommendation. | `uAgents`, AI Integration (Google Gemini) |
 
 ### Required Submission Badges
 
 The agents are categorized under Innovation Lab and are part of the Hackathon:
+
+!tag:innovationlab
+!tag:hackathon
 
 ### Setup and Running Instructions
 
@@ -34,7 +34,7 @@ cd edu-agent-platform/src
 This project requires `uagents` for agent communication and `hyperon` for MeTTa integration:
 
 ```bash
-pip install uagents hyperon
+pip install -r requirements.txt
 ```
 
 **3. Agent Addresses**
@@ -58,8 +58,10 @@ Run each agent in a separate terminal window, ensuring the `venv` is activated f
 | Terminal | Command | Role |
 | :--- | :--- | :--- |
 | **Terminal 1** | `python knowledge_agent.py` | Starts the MeTTa knowledge base. |
-| **Terminal 2** | `python tutor_agent.py` | Starts the central coordinator/grader. |
-| **Terminal 3** | `python student_agent.py` | Starts the user interface (CLI). |
+| **Terminal 2** | `python ai_assessment_agent.py` | (Optional) Starts the AI diagnostician. |
+| **Terminal 3** | `python tutor_agent.py` | Starts the central coordinator. |
+| **Terminal 4** | `python student_agent.py` | Starts the user interface (CLI). |
+
 
 **5. Interaction**
 

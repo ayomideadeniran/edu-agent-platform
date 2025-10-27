@@ -182,3 +182,8 @@ if __name__ == "__main__":
     with open("knowledge_address.txt", "w") as f:
         f.write(agent.address)
     agent.run()
+
+
+
+
+
