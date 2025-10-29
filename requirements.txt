@@ -4,7 +4,7 @@ hyperon
 metta-motto
 python-dotenv
 gunicorn
-
+google-genai
 
 
 
