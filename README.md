@@ -85,9 +85,69 @@ Once all three agents are running, interact with the platform via **Terminal 3**
 | **`MeTTa` Knowledge Graph** | Integrated into the `knowledge_agent.py` to query the `curriculum.metta` file. We use a robust `(question ...)` fact structure for reliable, subject/level-based retrieval. |
 | **Chat Protocol** | Implemented in the `student_agent.py` and `tutor_agent.py` to handle all user interactions, ensuring the application is compatible with the Agentverse and ASI:One interface for seamless human-agent interaction. |
 
----
 
-## 1. Creating the Virtual Environment (One-Time Setup)
+## Quick demo (how to run a minimal end-to-end)
+
+This quick demo shows the minimal steps to run the Student, Tutor and Knowledge agents and the Flask UI locally so a reviewer can verify a round-trip (send input → student ack → tutor/question → answer).
+
+1. Open a terminal and activate the project virtual environment (from `src/`):
+
+```bash
+cd ~/Documents/Project/ASI-Agents-Track/edu-agent-platform/src
+source venv/bin/activate
+```
+
+2. Start the Knowledge Agent (terminal 1):
+
+```bash
+# Terminal 1
+python knowledge_agent.py
+```
+
+3. (Optional) Start the AI Assessment Agent (terminal 2) if you use the diagnostic flow:
+
+```bash
+# Terminal 2
+python ai_assessment_agent.py
+```
+
+4. Start the Tutor Agent (terminal 3):
+
+```bash
+# Terminal 3
+python tutor_agent.py
+```
+
+5. Start the Student Agent (terminal 4):
+
+```bash
+# Terminal 4
+python student_agent.py
+```
+
+6. Start the Flask UI (separate terminal) and open the browser UI:
+
+```bash
+# Terminal 5
+python src/app.py
+# then open http://127.0.0.1:5000 in your browser
+```
+
+What to expect (happy path)
+- The UI will accept your input and show an immediate acknowledgement ("[Student Ack] Received input: ...").
+- The Student Agent terminal will display the tutor's question (the agent writes the question to its console and also stores it in a buffer exposed to the UI).
+- The UI will show the tutor question (blue box) and, once you submit an answer, will show your answer (gray box) and the tutor's feedback (green for correct, red for incorrect).
+
+Quick troubleshooting
+- If the UI shows "Input cannot be empty": ensure the browser request is posting JSON and that Flask is running on port 5000. Use the browser DevTools Network tab to inspect the POST `/submit_input` payload.
+- If Flask returns a 503 saying the Student Agent is not running, check that `student_agent.py` started without errors and is listening on port 8000.
+- If you see `{"error":"contents do not match envelope schema"}` when posting to `/submit`, make sure the Flask app is configured to POST to `http://127.0.0.1:8000/ui` (the Student Agent exposes `/ui` and `/submit` compatibility handlers).
+- If tutor responses are delayed, wait a few seconds — the UI polls for recent outputs for ~5–6s after submission. You can also re-submit or click Refresh to force another fetch.
+
+Notes for reviewers
+- The agent addresses are written to `student_address.txt`, `tutor_address.txt` and `knowledge_address.txt` on startup — include these in your review notes if needed.
+- The code includes `agent.include(..., publish_manifest=True)` which prepares manifests for Agentverse publishing.
+
 
 You typically do this step only once per project.
 

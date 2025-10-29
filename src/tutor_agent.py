@@ -111,7 +111,7 @@ def create_text_chat(text: str) -> ChatMessage:
     """Creates a generic ChatMessage with a single content item."""
     return ChatMessage(
         content=[TextContent(text=text)],
-        timestamp=datetime.utcnow(),
+        timestamp=datetime.utcnow().isoformat(),
         msg_id=uuid4()
     )
 
@@ -128,7 +128,7 @@ async def handle_student_chat_message(ctx: Context, sender: str, msg: ChatMessag
     """
     global PENDING_QUERY, PENDING_ASSESSMENT_SENDER
 
-    await ctx.send(sender, ChatAcknowledgement(acknowledged_msg_id=msg.msg_id, timestamp=datetime.utcnow()))
+    await ctx.send(sender, ChatAcknowledgement(acknowledged_msg_id=msg.msg_id, timestamp=datetime.utcnow().isoformat()))
 
     for item in msg.content:
         

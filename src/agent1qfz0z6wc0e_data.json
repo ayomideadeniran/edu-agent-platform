@@ -8,5 +8,10 @@
         "current_question": null
     },
     "last_student_query_addr": "agent1qddgfypwrksthknutu7pxxk4mkp86uma7g0lrxp8ae3wdx472qjxyxhzgp5",
-    "active_question_data_agent1qddgfypwrksthknutu7pxxk4mkp86uma7g0lrxp8ae3wdx472qjxyxhzgp5": null
+    "active_question_data_agent1qddgfypwrksthknutu7pxxk4mkp86uma7g0lrxp8ae3wdx472qjxyxhzgp5": {
+        "question": "What is 5 + 7?",
+        "correct_answer": "12",
+        "topic": "Addition Basics",
+        "explanation": "The sum of 5 and 7 is 12. Addition is a fundamental mathematical operation."
+    }
 }
