@@ -1,5 +1,5 @@
 import sys
-import os
+import os # <-- Added 'os' import for environment variable access
 import random 
 import re
 
@@ -28,15 +28,26 @@ METTA_ENGINE: MeTTa = None
 METTA_FILE = "curriculum.metta"
 knowledge_protocol = Protocol(name="Knowledge", version="0.1")
 
+
+# --- VITAL DEPLOYMENT FIX: DYNAMIC ENDPOINT ---
+KNOWLEDGE_AGENT_PORT = 8002
+# Get the public URL from the environment, defaulting to localhost for dev/testing
+BASE_URL = os.environ.get("PUBLIC_URL", "http://127.0.0.1")
+KNOWLEDGE_AGENT_ENDPOINT = f"{BASE_URL}:{KNOWLEDGE_AGENT_PORT}/submit"
+
+
 # --- AGENT SETUP ---
 agent = Agent(
     name="knowledge_agent",
-    port=8002,
+    port=KNOWLEDGE_AGENT_PORT,
     seed="knowledge_agent_seed_phrase",
-    endpoint=["http://127.0.0.1:8002/submit"],
+    # *** UPDATED ENDPOINT ***
+    endpoint=[KNOWLEDGE_AGENT_ENDPOINT],
 )
 
 fund_agent_if_low(agent.wallet.address())
+
+# ... (rest of your knowledge agent logic)
 
 
 # --- HELPER FUNCTIONS ---

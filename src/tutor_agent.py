@@ -1,6 +1,6 @@
 import json
 import sys
-import os
+import os # Ensure os is imported here
 from datetime import datetime
 from uuid import uuid4
 from uagents import Agent, Context, Protocol, Model
@@ -34,14 +34,25 @@ if project_root not in sys.path:
 
 # --- AGENT SETUP ---
 AGENT_NAME = "tutor_agent"
+
+# --- VITAL DEPLOYMENT FIX: DYNAMIC ENDPOINT ---
+TUTOR_AGENT_PORT = 8001
+# Get the public URL from the environment, defaulting to localhost for dev/testing
+BASE_URL = os.environ.get("PUBLIC_URL", "http://127.0.0.1")
+TUTOR_AGENT_ENDPOINT = f"{BASE_URL}:{TUTOR_AGENT_PORT}/submit"
+
+
 agent = Agent(
     name=AGENT_NAME,
-    port=8001,
+    port=TUTOR_AGENT_PORT,
     seed=f"{AGENT_NAME}_seed_phrase",
-    endpoint=[f"http://127.0.0.1:8001/submit"],
+    # *** UPDATED ENDPOINT ***
+    endpoint=[TUTOR_AGENT_ENDPOINT],
 )
 
 fund_agent_if_low(agent.wallet.address())
+
+# ... (rest of your tutor agent logic)
 
 # Define protocols
 tutor_protocol = Protocol(name="Tutor", version="0.1")

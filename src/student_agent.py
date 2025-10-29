@@ -1,13 +1,15 @@
+# ... (Existing imports remain the same)
 import sys
 import os
 import json
 from datetime import datetime
+# --- NEW IMPORT ---
 from uuid import uuid4
 import asyncio
 
 # --- CRITICAL ABSOLUTE PATH FIX ---
 current_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.dirname(current_dir)
+project_root = os.path.dirname(os.path.dirname(current_dir)) # Corrected path traversal
 if project_root not in sys.path:
     sys.path.append(project_root)
 
@@ -38,21 +40,32 @@ chat_proto = Protocol(spec=chat_protocol_spec)
 # --- CONFIGURATION ---
 TUTOR_AGENT_ADDRESS = None 
 try:
+    # NOTE: The address file should typically be outside the src/ folder if this agent is in src/
     with open("tutor_address.txt", "r") as f:
         TUTOR_AGENT_ADDRESS = f.read().strip()
 except FileNotFoundError:
     print("Tutor Agent address not found. Please run tutor_agent.py first.")
 
-# --- AGENT SETUP ---
+
+# --- VITAL DEPLOYMENT FIX: DYNAMIC ENDPOINT ---
+STUDENT_AGENT_PORT = 8000
+# Get the public URL from the environment, defaulting to localhost for dev/testing
+BASE_URL = os.environ.get("PUBLIC_URL", "http://127.0.0.1")
+STUDENT_AGENT_ENDPOINT = f"{BASE_URL}:{STUDENT_AGENT_PORT}/submit" # Keep the /submit path!
+
+
+# --- AGENT INSTANTIATION ---
 agent = Agent(
     name="student_agent",
-    port=8000,
+    port=STUDENT_AGENT_PORT,
     seed="student_agent_seed_phrase",
-    # The agent's endpoint is what the Flask app will POST to
-    endpoint=["http://127.0.0.1:8000/submit"], 
+    # *** UPDATED ENDPOINT ***
+    endpoint=[STUDENT_AGENT_ENDPOINT], 
 )
 
 fund_agent_if_low(agent.wallet.address())
+
+# ... (rest of the agent logic continues below)
 
 
 # --- STATE TRACKING (Global Variables) ---

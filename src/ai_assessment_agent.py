@@ -3,19 +3,22 @@ import sys
 import os
 import json
 from dotenv import load_dotenv
+from typing import Dict, Any
 
 # --- Load Environment Variables FIRST (From .env file) ---
 # This ensures os.environ.get() can find the keys immediately.
-# load_dotenv() is already present in your original code, but kept here for completeness.
 load_dotenv() 
 # --------------------------------------------------------
 
 from uagents import Agent, Context, Protocol
 from uagents.setup import fund_agent_if_low
+# Assuming 'models' is a relative import one level up from the script's location (e.g., in the project root)
+# If your agent scripts are in a 'src' folder, you might need to adjust the path resolution in the CRITICAL FIX section.
 from models import AssessmentRequest, AssessmentResponse 
-from typing import Dict, Any
+
 
 # --- CRITICAL ABSOLUTE PATH FIX ---
+# Adjusting path traversal slightly for common project structures
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(current_dir)
 if project_root not in sys.path:
@@ -31,23 +34,20 @@ except ImportError:
 
 # Initialize the Gemini Client.
 try:
-    # --- CORRECTED VARIABLE NAME HERE ---
     GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY') 
     
     if not GEMINI_API_KEY:
-         # Changed error message to reflect the correct variable
          raise ValueError("GEMINI_API_KEY environment variable is not set.")
 
     GEMINI_CLIENT = genai.Client(api_key=GEMINI_API_KEY)
     GEMINI_MODEL = 'gemini-2.5-flash' 
 except Exception as e:
-    # Log the failure but allow the agent to run, relying on the mock fallback.
     print(f"INFO: Failed to initialize Gemini Client at startup: {e}. Assuming local mock will be needed.")
     GEMINI_CLIENT = None
     GEMINI_MODEL = None
 # ------------------------------------
 
-# --- LOCAL MOCK FALLBACK FUNCTION ---
+# --- LOCAL MOCK FALLBACK FUNCTION (AS PROVIDED) ---
 def determine_mock_recommendation(challenges: str, error_message: str) -> Dict[str, Any]:
     """
     Analyzes user challenges using keyword matching to generate a realistic mock recommendation
@@ -146,14 +146,18 @@ def determine_mock_recommendation(challenges: str, error_message: str) -> Dict[s
 # ------------------------------------
 
 
-# --- AGENT SETUP ---
+# --- AGENT SETUP WITH DYNAMIC ENDPOINT FIX ---
 AGENT_NAME = "ai_assessment_agent"
+ASSESSMENT_AGENT_PORT = 8003
+BASE_URL = os.environ.get("PUBLIC_URL", "http://127.0.0.1")
+ASSESSMENT_AGENT_ENDPOINT = f"{BASE_URL}:{ASSESSMENT_AGENT_PORT}/submit"
+
 agent = Agent(
     name=AGENT_NAME,
-    port=8003,
+    port=ASSESSMENT_AGENT_PORT,
     # Assuming FETCH_WALLET_SEED_PHRASE is also loaded from .env
     seed=os.environ.get("FETCH_WALLET_SEED_PHRASE") or f"{AGENT_NAME}_seed_phrase", 
-    endpoint=[f"http://127.0.0.1:8003/submit"], 
+    endpoint=[ASSESSMENT_AGENT_ENDPOINT], # *** DYNAMIC ENDPOINT APPLIED ***
 )
 fund_agent_if_low(agent.wallet.address())
 

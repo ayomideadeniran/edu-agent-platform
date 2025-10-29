@@ -56,11 +56,11 @@ For the judges' reference, the expected addresses for the agents are:
   * **Knowledge Agent:**
   `agent1qtmnjcac90xddj67av0j3jumtrj8y6y69xtxslpt9e0uuszufnz3xxu0pky`
 
-**4. Run Agents (In Order)**
+**4. Run Agents (In Order)** 
 
 Run each agent in a separate terminal window, ensuring the `venv` is activated for all sessions:
 
-| Terminal | Command | Role |
+| Terminal | Command | Role | 
 | :--- | :--- | :--- |
 | **Terminal 1** | `python knowledge_agent.py` | Starts the MeTTa knowledge base. |
 | **Terminal 2** | `python ai_assessment_agent.py` | (Optional) Starts the AI diagnostician. |
