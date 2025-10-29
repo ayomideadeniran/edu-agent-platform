@@ -5,6 +5,6 @@ metta-motto
 python-dotenv
 gunicorn
 google-genai
-
+flask
 
 
