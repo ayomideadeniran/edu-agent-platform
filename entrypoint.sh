@@ -17,6 +17,9 @@ python src/student_agent.py &
 # Wait a moment for agents to start up and register on Agentverse
 sleep 15
 
+
+export PYTHONPATH=$PYTHONPATH:.
+
 # --- Start the Flask App (Web Server) using Gunicorn ---
 # Gunicorn is used instead of 'python app.py' for production reliability
 # Replace 'app:app' with the appropriate module:instance reference for your Flask app
