@@ -23,4 +23,4 @@ export PYTHONPATH=$PYTHONPATH:.
 # --- Start the Flask App (Web Server) using Gunicorn ---
 # Gunicorn is used instead of 'python app.py' for production reliability
 # Replace 'app:app' with the appropriate module:instance reference for your Flask app
-exec gunicorn --bind 0.0.0.0:5000 app:app
+exec gunicorn --bind 0.0.0.0:5000 'app:app' --workers 1 --timeout 120
