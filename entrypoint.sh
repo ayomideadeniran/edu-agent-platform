@@ -15,7 +15,7 @@ python src/tutor_agent.py &
 python src/student_agent.py &
 
 # Wait a moment for agents to start up and register on Agentverse
-sleep 30
+sleep 90
 
 
 export PYTHONPATH=$PYTHONPATH:.
