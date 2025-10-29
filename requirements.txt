@@ -2,7 +2,8 @@ uagents
 uagents-core
 hyperon
 metta-motto
-
+python-dotenv
+gunicorn
 
 
 
